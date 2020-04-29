@@ -1,3 +1,3 @@
-#Natural Language Processing
+# Natural Language Processing
 
-A collection of NLP algorithms usually written in Python.
+A collection of NLP algorithms written in Python.
