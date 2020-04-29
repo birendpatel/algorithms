@@ -9,7 +9,7 @@ an option in most natural language processing tools.
 import re
 from enum import Enum
 
-class common_patterns(Enum):
+class CommonPatterns(Enum):
     """
     Purpose
     -------
@@ -26,7 +26,7 @@ class common_patterns(Enum):
     #pattern matching all \w character class words
     WORDS = r"\b\w+\b"
 
-class regex_tokenizer():
+class RegexTokenizer():
     """
     Purpose
     -------
