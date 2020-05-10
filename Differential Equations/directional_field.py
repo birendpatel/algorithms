@@ -84,14 +84,14 @@ class DirectionalField():
         self.domain_image_pairs = []
 
         #the derivative will be calculated for all pairs (t_coords, x_coords)
-        t_coordinates = np.linspace(*t_parameters, samples)
-        x_coordinates = np.linspace(*x_parameters, samples)
+        t_coordinates, t_dist = np.linspace(*t_parameters, samples, retstep=True)
+        x_coordinates, x_dist = np.linspace(*x_parameters, samples, retstep=True)
         
         #an invisible bounding box will be centered over each sampled pair.
         #We define here the distance of box edges from the center of the box.
         #these limits prevents the drawns lines from intersecting.
-        t_box_limits = 0.25  * abs(t_coordinates[0] - t_coordinates[1])
-        x_box_limits = 0.25  * abs(x_coordinates[0] - x_coordinates[1])
+        t_box_limits = 0.25  * t_dist
+        x_box_limits = 0.25  * x_dist
 
         # loop through each (t,x) and draw a centered line with slope = ddt
         for i in t_coordinates:
