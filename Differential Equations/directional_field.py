@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 class DirectionalField():
     """
-    Plot a directional field given a differential equation. 
+    Plot a directional field given a differential equation.
 
     Example
     -------
@@ -18,7 +18,7 @@ class DirectionalField():
     >>>     return x*cos(t)
     >>>
     >>> DF = DirectionalField(differential_equation)
-    >>> DF.create_field((0, 10, 20), (-3, 3, 20))
+    >>> DF.create_field((0, 10), (-3, 3), 20)
     >>> DF.plot()
     """
 
@@ -29,7 +29,7 @@ class DirectionalField():
         differential_equation : function
             A suitable differential equation with input floats t and f(t) = x
             and an output float representing the derivative. Function must
-            accept arguments in the order of t, x. 
+            accept arguments in the order of t, x.
 
         Returns
         -------
@@ -38,7 +38,7 @@ class DirectionalField():
 
         self.differential_equation = differential_equation
         self.domain_image_pairs = []
-        
+
     def calculate_derivative(self, t, x):
         """
         A simple wrapper over the provided differential equation to improve
@@ -49,7 +49,7 @@ class DirectionalField():
         ----------
         t : float
         x : float
-        
+
         Returns
         -------
         float
@@ -57,14 +57,14 @@ class DirectionalField():
 
         """
         return self.differential_equation(t, x)
-        
+
     def create_field(self, t_parameters, x_parameters, samples):
         """
         Calculate derivative at each possible coordinate pair provided via
         parameters and define the function of a line passing through each
         coordinate pair with the given slop. Truncate starting and ending
         coordinates of each line for visualization purposes.
-        
+
         Parameters
         ----------
         t_parameters : tuple
@@ -86,7 +86,7 @@ class DirectionalField():
         #the derivative will be calculated for all pairs (t_coords, x_coords)
         t_coordinates, t_dist = np.linspace(*t_parameters, samples, retstep=True)
         x_coordinates, x_dist = np.linspace(*x_parameters, samples, retstep=True)
-        
+
         #an invisible bounding box will be centered over each sampled pair.
         #We define here the distance of box edges from the center of the box.
         #these limits prevents the drawns lines from intersecting.
@@ -104,32 +104,32 @@ class DirectionalField():
                 #remove parts of the line that exceed the bounding square box
                 lower_bound = image < j - x_box_limits
                 upper_bound = image > j + x_box_limits
-                del_inds = np.argwhere((lower_bound)|(upper_bound)).flatten()
+                del_inds = np.argwhere((lower_bound)|(upper_bound))
                 image = np.delete(image, del_inds)
                 domain = np.delete(domain, del_inds)
-                
+
                 self.domain_image_pairs.append((domain, image))
 
-    def plot(self, figure_size=(15,15), title_font=25, axis_font=20):
+    def plot(self, figure_size=(6,6), title_font=15, axis_font=10):
         """
         Plot a line at each sampled coordinate pair.
-        
+
         Parameters
         ----------
         figure_size : tuple, optional
-            matplotlib figure method parameter for figsize. The default is 
-            (15,15).
+            matplotlib figure method parameter for figsize. The default is
+            (6,6).
         title_font : int, optional
-            matplotlib title method parameter for fontsize. The default is 25.
+            matplotlib title method parameter for fontsize. The default is 15.
         axis_font : int, optional
-            matplotlib xlabel and ylabel method parameter for fontsize. The 
-            default is 20.
+            matplotlib xlabel and ylabel method parameter for fontsize. The
+            default is 10.
 
         Returns
         -------
         None
         """
-        
+
         plt.figure(figsize = figure_size)
         plt.title("Directional Field", fontsize = title_font)
         plt.xlabel("t", fontsize = axis_font)
@@ -138,3 +138,5 @@ class DirectionalField():
         #loop through collection of lines and plot each one
         for i in self.domain_image_pairs:
             plt.plot(*i, color="black")
+
+        plt.show()
