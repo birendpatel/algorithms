@@ -2,11 +2,13 @@
 Author: Biren Patel
 Description: A prototype for a genetic algorithm with a small memory footprint.
 This is just a rough sketch, to be rewritten in C for use in microcontrollers.
-Also, this one constrains chromosomes to maximum length of 64 bits for more
-agressive optimizations. Also avoids numpy arrays.
+Also constrains chromosomes to maximum length of 64 bits for more agressive
+optimizations. The goal is to eventually create a tiny but powerful GA which
+requires no more than 50 bytes of SRAM, excluding the fitness function.
 """
 
 from numpy.random import default_rng
+from copy import copy
 
 class GeneticAlgorithm():
     def __init__(self, obj_func, popsize, chr_len, debug=0):
@@ -45,7 +47,9 @@ class GeneticAlgorithm():
 
         #calc fitness of initial population
         self.fitness = []
-        self.calculate_fitness()
+        self.calculate_population_fitness()
+
+        self.children = []
 
     def initialize_population(self):
         """
@@ -67,7 +71,10 @@ class GeneticAlgorithm():
             print("---------- POPULATION INIT ----------\n")
             print(self.population, end = "\n\n")
 
-    def calculate_fitness(self):
+    def calculate_population_fitness(self):
+        """
+        fitness of each pop member into list
+        """
         for i in range(self.popsize):
             self.fitness.append(self.obj_func(self.population[i]))
 
@@ -75,14 +82,103 @@ class GeneticAlgorithm():
             print("---------- FITNESS INIT ----------\n")
             print(self.fitness, end = "\n\n")
 
+    def __rshift__(self, gens):
+        for i in range(gens):
+            self.evolve()
+
+    def evolve(self):
+        """
+        evolve forward one generation
+        """
+        #for popsize
+        for i in range(self.popsize):
+            #select two parents from current gen
+            p1, p2 = self.select()
+
+            #cross parents
+            c1, c2 = self.crossover(p1, p2)
+
+            #mutate results
+            c1 = self.mutate(c1)
+            c2 = self.mutate(c2)
+
+            #decision on who goes into the pop
+
+
     def select(self):
-        pass
+        self.rand = self.prng()
 
-    def crossover(self):
-        pass
+        #obviously biased since not power of 2. ITS JUST A PROTOTYPE!
+        idx_1 = (self.rand & 0xFFFFFFFF) % self.popsize
+        idx_2 = (self.rand >> 32) % self.popsize
 
-    def mutate(self):
-        pass
+        return (self.population[idx_1], self.population[idx_2])
+
+    def crossover(self, p1, p2):
+        """
+        1/chr_len probability of no crossover
+        """
+        crossover_point = self.prng() % self.chr_len
+
+        crossover_mask_R = self.chr_mask >> crossover_point
+        crossover_mask_L = self.chr_mask ^ crossover_mask_R
+
+        c1 = (p1 & crossover_mask_R) | (p2 & crossover_mask_L)
+        c2 = (p2 & crossover_mask_R) | (p1 & crossover_mask_L)
+
+        #if self.debug:
+        #    print(crossover_point)
+        #    print(bin(p1)[2:].zfill(self.chr_len))
+        #    print(bin(p2)[2:].zfill(self.chr_len))
+        #    print(bin(c1)[2:].zfill(self.chr_len))
+        #    print(bin(c2)[2:].zfill(self.chr_len))
+
+        return (c1, c2)
+
+    def mutate(self, child):
+        """
+        bit operations emulate a binomial distribution over each chromosome
+        with PDF parmeters n=chr_len, p=.03125.
+
+        The probability is simulated using AND bit operations on sections of
+        the PCG word so that 1/32 achieves the probability of a bit set.
+
+        1/64 would be less wasteful of the bit stream but it creates a ~1.5%
+        probability of mutation. This is more wasteful of the mutation operator
+        since most strings will not induce a change in the child chromosome.
+
+        so I find 1/32 to be a decent heuristic tradeoff of bit stream resources
+        against the computational expense of running a mutation, and against the
+        exploration versus exploitation of the search space.
+        """
+        self.rand = self.prng()
+
+        #of the five mutator genes we need, set the first one
+        mutator = self.rand & self.chr_mask
+        self.rand >>= self.chr_len
+
+        for i in range(4):
+            #refresh stream if empty
+            if self.rand == 0:
+                self.rand = self.prng()
+
+            #create a mutator gene and immediately AND with the current gene
+            mutator &= (self.rand & self.chr_mask)
+
+            #dump used bits
+            self.rand >>= self.chr_len
+
+        #reset rand since no guarantee that the bit stream is empty (failsafe)
+        self.rand = 0
+
+        if self.debug:
+            print(bin(child)[2:].zfill(self.chr_len))
+            print(bin(mutator)[2:].zfill(self.chr_len))
+            print(bin(child ^ mutator)[2:].zfill(self.chr_len))
+            print("\n\n")
+
+        #xor mutator with child to mutate each bit with probably 1/32
+        return child ^ mutator
 
 decoder = (5.12 - -5.12)/(2**8 -1)
 min = -5.12
@@ -100,3 +196,4 @@ def sphere(chromosome):
 #debugging
 if __name__ == "__main__":
     genetic_algorithm = GeneticAlgorithm(sphere, 8,16, debug=1)
+    genetic_algorithm >> 1
