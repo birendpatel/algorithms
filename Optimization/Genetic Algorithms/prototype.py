@@ -9,10 +9,12 @@ requires no more than 50 bytes of SRAM, excluding the fitness function.
 
 from numpy.random import default_rng
 from copy import copy
+from time import process_time_ns
 
 class GeneticAlgorithm():
     def __init__(self, obj_func, popsize, chr_len, debug=0):
         self.debug = debug
+        self.gen_counter = 1
 
         #function to **MINIMIZE**
         self.obj_func = obj_func
@@ -68,18 +70,20 @@ class GeneticAlgorithm():
             self.rand >>= self.chr_len
 
         if self.debug:
-            print("---------- POPULATION INIT ----------\n")
+            print("---------- POPULATION {} ----------\n".format(self.gen_counter))
             print(self.population, end = "\n\n")
 
     def calculate_population_fitness(self):
         """
         fitness of each pop member into list
         """
+        self.fitness = []
+
         for i in range(self.popsize):
             self.fitness.append(self.obj_func(self.population[i]))
 
-        if self.debug:
-            print("---------- FITNESS INIT ----------\n")
+        if self.debug and self.gen_counter == 1:
+            print("---------- FITNESS {} ----------\n".format(self.gen_counter))
             print(self.fitness, end = "\n\n")
 
     def __rshift__(self, gens):
@@ -91,6 +95,8 @@ class GeneticAlgorithm():
         evolve forward one generation
         """
         #for popsize
+        self.children = []
+
         for i in range(self.popsize):
             #select two parents from current gen
             p1, p2 = self.select()
@@ -103,9 +109,32 @@ class GeneticAlgorithm():
             c2 = self.mutate(c2)
 
             #decision on who goes into the pop
+            f_val_p1 = self.obj_func(p1)
+            f_val_p2 = self.obj_func(p2)
+            f_val_c1 = self.obj_func(c1)
+            f_val_c2 = self.obj_func(c2)
 
+            if f_val_c1 < f_val_p1:
+                self.children.append(c1)
+            else:
+                self.children.append(p1)
 
-    def select(self):
+            #if f_val_c2 < f_val_p2:
+            #    self.children.append(c2)
+            #else:
+            #    self.children.append(p2)
+
+        self.population = copy(self.children)
+        self.gen_counter += 1
+        self.calculate_population_fitness()
+
+        if self.debug:
+            print("---------- POPULATION {} ----------\n".format(self.gen_counter))
+            print(self.population, end = "\n\n")
+            print("---------- FITNESS {} ----------\n".format(self.gen_counter))
+            print(self.fitness, end = "\n\n")
+
+    def select(self): #550 ns
         self.rand = self.prng()
 
         #obviously biased since not power of 2. ITS JUST A PROTOTYPE!
@@ -114,7 +143,7 @@ class GeneticAlgorithm():
 
         return (self.population[idx_1], self.population[idx_2])
 
-    def crossover(self, p1, p2):
+    def crossover(self, p1, p2): #1 us
         """
         1/chr_len probability of no crossover
         """
@@ -135,7 +164,7 @@ class GeneticAlgorithm():
 
         return (c1, c2)
 
-    def mutate(self, child):
+    def mutate(self, child): #2.5 us
         """
         bit operations emulate a binomial distribution over each chromosome
         with PDF parmeters n=chr_len, p=.03125.
@@ -171,29 +200,37 @@ class GeneticAlgorithm():
         #reset rand since no guarantee that the bit stream is empty (failsafe)
         self.rand = 0
 
-        if self.debug:
-            print(bin(child)[2:].zfill(self.chr_len))
-            print(bin(mutator)[2:].zfill(self.chr_len))
-            print(bin(child ^ mutator)[2:].zfill(self.chr_len))
-            print("\n\n")
+        #if self.debug:
+        #    print(bin(child)[2:].zfill(self.chr_len))
+        #    print(bin(mutator)[2:].zfill(self.chr_len))
+        #    print(bin(child ^ mutator)[2:].zfill(self.chr_len))
+        #    print("\n\n")
 
         #xor mutator with child to mutate each bit with probably 1/32
         return child ^ mutator
 
 decoder = (5.12 - -5.12)/(2**8 -1)
-min = -5.12
+min_val = -5.12
 def sphere(chromosome):
     """
     sample objective function, a toy problem taking a 16 bit chromosome and
     using two 8 bit sections as binary encodings of real numbers. The
     function is the famous 3D sphere, a convex minimization with a gradient.
     """
-    param_1 = (chromosome & 255) * decoder + min
-    param_2 = (chromosome >> 8) * decoder + min
+    param_1 = (chromosome & 255) * decoder + min_val
+    param_2 = (chromosome >> 8) * decoder + min_val
 
     return (param_1 ** 2) + (param_2 ** 2)
 
 #debugging
 if __name__ == "__main__":
-    genetic_algorithm = GeneticAlgorithm(sphere, 8,16, debug=1)
-    genetic_algorithm >> 1
+    genetic_algorithm = GeneticAlgorithm(sphere, 8,16, debug=0)
+
+    print("best: {}".format(min(genetic_algorithm.fitness)))
+
+    start = process_time_ns()
+    genetic_algorithm >> 10000
+    end = process_time_ns()
+
+    print("best: {}".format(min(genetic_algorithm.fitness)))
+    print("time: {}".format((end-start)/(10**9)))
