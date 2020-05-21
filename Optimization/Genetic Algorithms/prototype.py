@@ -3,10 +3,10 @@ Author: Biren Patel
 Description: A prototype for a genetic algorithm with a small memory footprint.
 This is just a rough sketch, to be rewritten in C for use in microcontrollers.
 Also, this one constrains chromosomes to maximum length of 64 bits for more
-agressive optimizations.
+agressive optimizations. Also avoids numpy arrays.
 """
 
-import numpy as np
+from numpy.random import default_rng
 
 class GeneticAlgorithm():
     def __init__(self, obj_func, popsize, chr_len, debug=0):
@@ -32,22 +32,27 @@ class GeneticAlgorithm():
         #handy mask over chromosome length to be used through the class.
         self.chr_mask = 2**self.chr_len - 1
 
-        #this mouthful allows us to access the unsigned 64 bit integer from PCG.
+        #this allows us to access the unsigned 64 bit integer from a PCG.
         #algo works with the PCG word size, hence everything in multiples of 8.
-        self.prng = np.random.default_rng().bit_generator.random_raw
+        self.prng = default_rng().bit_generator.random_raw
         self.rand = 0
 
+        ## ALGORITHM STEPS
         #initialize a population of random individuals.
         #not going to be picky about data types since this is just a sketch.
-        self.population = np.empty(self.popsize, dtype="uint64")
+        self.population = []
         self.initialize_population()
+
+        #calc fitness of initial population
+        self.fitness = []
+        self.calculate_fitness()
 
     def initialize_population(self):
         """
         pcg word is AND'd with chromosome mask, result is a population member.
-        if word still has capacity, rshift by chromosome length and repeat.
-        if no capacity, run PCG again and repeat. dump extra bits at end in
-        case, but there wont actually be any since we work in multiples of 8.
+        rshift the word by chromosome length and repeat. if no capacity, run
+        PCG again and repeat. no need to dump extra bits at end, there wont be
+        any since we work in multiples of 8.
         """
         for i in range(self.popsize):
             #fetch next int from PCG if bit stream is empty
@@ -55,17 +60,20 @@ class GeneticAlgorithm():
                 self.rand = self.prng()
 
             #create a population member then dump the used bits
-            self.population[i] = self.rand & self.chr_mask
+            self.population.append(self.rand & self.chr_mask)
             self.rand >>= self.chr_len
 
         if self.debug:
             print("---------- POPULATION INIT ----------\n")
-            print(self.population)
+            print(self.population, end = "\n\n")
 
-            if str(self.population.dtype) == "uint64":
-                print("population dtype: PASS\n")
-            else:
-                print("population dtype: FAIL\n")
+    def calculate_fitness(self):
+        for i in range(self.popsize):
+            self.fitness.append(self.obj_func(self.population[i]))
+
+        if self.debug:
+            print("---------- FITNESS INIT ----------\n")
+            print(self.fitness, end = "\n\n")
 
     def select(self):
         pass
@@ -76,14 +84,19 @@ class GeneticAlgorithm():
     def mutate(self):
         pass
 
+decoder = (5.12 - -5.12)/(2**8 -1)
+min = -5.12
 def sphere(chromosome):
     """
-    sample objective function, a toy problem taking a 32 bit chromosome and
-    using two 16 bit sections as binary encodings of real numbers. The
+    sample objective function, a toy problem taking a 16 bit chromosome and
+    using two 8 bit sections as binary encodings of real numbers. The
     function is the famous 3D sphere, a convex minimization with a gradient.
     """
-    pass
+    param_1 = (chromosome & 255) * decoder + min
+    param_2 = (chromosome >> 8) * decoder + min
+
+    return (param_1 ** 2) + (param_2 ** 2)
 
 #debugging
 if __name__ == "__main__":
-    genetic_algorithm = GeneticAlgorithm(16,8, debug=1)
+    genetic_algorithm = GeneticAlgorithm(sphere, 8,16, debug=1)
