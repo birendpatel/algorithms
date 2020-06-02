@@ -6,9 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "stack.h"
-
-#define STACK_SIZE 10
 
 /*******************************************************************************
 * structure: struct stack
@@ -17,20 +16,9 @@
 *******************************************************************************/
 struct stack
 {
-    int data[STACK_SIZE];
+    stack_item data[STACK_SIZE];
     int top_of_stack;
 };
-
-/*******************************************************************************
-* private functions
-*******************************************************************************/
-
-//print debugging information to stdin and exit
-static void terminate(const char *fx_name, const char *f_name, int ln)
-{
-    printf("\nFAILURE: %s : %d - %s operation failed\n", f_name, ln, fx_name);
-    exit(EXIT_FAILURE);
-}
 
 /*******************************************************************************
 * public functions
@@ -40,16 +28,10 @@ static void terminate(const char *fx_name, const char *f_name, int ln)
 struct stack *stack_create(void)
 {
     struct stack *stack_ptr = malloc(sizeof(struct stack));
+    assert(stack_ptr != NULL);
 
-    if (stack_ptr == NULL)
-    {
-        terminate(__func__, __FILE__, __LINE__);
-    }
-    else
-    {
-        stack_ptr->top_of_stack = 0;
-        return stack_ptr;
-    }
+    stack_ptr->top_of_stack = 0;
+    return stack_ptr;
 }
 
 //free memory used by stack
@@ -61,53 +43,34 @@ void stack_destroy(struct stack *s)
 //check if stack is empty
 bool is_empty(struct stack *s)
 {
-    if (s->top_of_stack == 0)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return s->top_of_stack == 0;
 }
 
 //check if stack is full
 bool is_full(struct stack *s)
 {
-    if (s->top_of_stack == STACK_SIZE)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return s->top_of_stack == STACK_SIZE;
 }
 
 //push an item onto the stack if not full
-void stack_push(struct stack *s, int datum)
+void stack_push(struct stack *s, stack_item datum)
 {
-    if (is_full(s))
-    {
-        terminate(__func__, __FILE__, __LINE__);
-    }
-    else
-    {
-        s->data[s->top_of_stack++] = datum;
-    }
+    assert(!is_full(s));
+    s->data[s->top_of_stack++] = datum;
 }
 
 //pop an item off the stack if not empty
-int stack_pop(struct stack *s)
+stack_item stack_pop(struct stack *s)
 {
-    if (is_empty(s))
-    {
-        terminate(__func__, __FILE__, __LINE__);
-    }
-    else
-    {
-        return s->data[--s->top_of_stack];
-    }
+    assert(!is_empty(s));
+    return s->data[--s->top_of_stack];
+}
+
+//retrieve but do not remove the top item from the stack
+stack_item stack_peek(struct stack *s)
+{
+    assert(!is_empty(s));
+    return s->data[s->top_of_stack - 1];
 }
 
 //clear the stack by resetting index, but don't delete the existing data
@@ -121,7 +84,7 @@ void stack_print(struct stack *s)
 {
     for(int i = 0; i < s->top_of_stack; ++i)
     {
-        printf("%3d ", s->data[i]);
+        printf(STACK_PRINT_FMT, s->data[i]);
     }
     puts("");
 }

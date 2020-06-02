@@ -1,12 +1,22 @@
 /*
 * author: Biren Patel
-* description: interface for fixed-length stack data structure.
+* description: API for fixed-length stack data structure.
 */
 
 #ifndef STACK_H
 #define STACK_H
 
 #include <stdbool.h>
+
+/*******************************************************************************
+* purpose: pre-compilation modifiable parameters
+* @ typedef : change data type in stack without resorting to a generic ADT.
+* @ STACK_PRINT_FMT : adjust the format string for the stack_print function.
+* @ STACK_SIZE : maximum number of elements held in stack
+*******************************************************************************/
+typedef int stack_item;
+#define STACK_PRINT_FMT "%d "
+#define STACK_SIZE 10
 
 /*******************************************************************************
 * structure: struct stack
@@ -50,7 +60,7 @@ bool is_empty(struct stack *s);
 * @ s : pointer to struct stack
 * @ datum : item to push
 *******************************************************************************/
-void stack_push(struct stack *s, int datum);
+void stack_push(struct stack *s, stack_item datum);
 
 /*******************************************************************************
 * function: stack_pop
@@ -58,7 +68,15 @@ void stack_push(struct stack *s, int datum);
 * @ s : pointer to struct stack
 * returns: the popped item
 *******************************************************************************/
-int stack_pop(struct stack *s);
+stack_item stack_pop(struct stack *s);
+
+/*******************************************************************************
+* function: stack_peek
+* purpose: retrieve but do not remove the top item from the stack
+* @ s : pointer to struct stack
+* returns: copy of top item in stack
+*******************************************************************************/
+stack_item stack_peek(struct stack *s);
 
 /*******************************************************************************
 * function: stack_clear
