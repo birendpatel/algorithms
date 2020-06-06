@@ -59,31 +59,33 @@ bool is_empty(struct stack *s);
 * purpose: operation to push item onto stack
 * @ s : pointer to struct stack
 * @ datum : item to push
+* returns: 1 for successful push, 0 for failed push.
 *******************************************************************************/
-void stack_push(struct stack *s, stack_item datum);
+int stack_push(struct stack *s, stack_item datum);
 
 /*******************************************************************************
 * function: stack_pop
 * purpose: operation to pop an item last-in-first-out
 * @ s : pointer to struct stack
-* returns: the popped item
+* returns: pointer to the popped item, or null pointer if stack is empty.
 *******************************************************************************/
-stack_item stack_pop(struct stack *s);
+stack_item *stack_pop(struct stack *s);
 
 /*******************************************************************************
 * function: stack_peek
 * purpose: retrieve but do not remove the top item from the stack
 * @ s : pointer to struct stack
-* returns: copy of top item in stack
+* returns: pointer to the top item in stack, or null pointer if stack is empty.
 *******************************************************************************/
-stack_item stack_peek(struct stack *s);
+stack_item *stack_peek(struct stack *s);
 
 /*******************************************************************************
 * function: stack_clear
 * purpose: operation to clear the stack, resets index but does not remove items
 * @ s : pointer to struct stack
+* returns: number of items cleared out of the stack.
 *******************************************************************************/
-void stack_clear(struct stack *s);
+int stack_clear(struct stack *s);
 
 /*******************************************************************************
 * function: stack_print
