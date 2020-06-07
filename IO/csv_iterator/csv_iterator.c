@@ -21,12 +21,24 @@ struct csv
 };
 
 /*******************************************************************************
-* private function: handle_fmt_string
-* purpose: determine number of columns and their data types
+* private function: calc_num_columns
+* purpose: determine number of columns based on supplied format string
+* @ csvfile : pointer to struct csv
 * @ fmt : format string passed by user on contructor
 * @ sep : separating chacter passed by user on constructor
+* returns: total number of columns
 *******************************************************************************/
-void handle_fmt_string(char *fmt, char sep);
+static int calc_num_columns(struct csv *csvfile, char *fmt, char sep);
+
+/*******************************************************************************
+* private function: infer_data_types
+* purpose: determine data type of each column based on supplied format string
+* @ csvfile : pointer to struct csv
+* @ fmt : format string passed by user on contructor
+* @ sep : separating chacter passed by user on constructor
+* returns: char array where each element supplies format character for a switch
+*******************************************************************************/
+static char *infer_data_types(struct csv *csvfile, char *fmt, char sep);
 
 /*******************************************************************************
 * public functions
@@ -35,64 +47,88 @@ void handle_fmt_string(char *fmt, char sep);
 //constructor
 struct csv *csv_create(char* filename, char *fmt, char sep)
 {
+    //pointer to be returned to client
+    struct csv *csvfile = malloc(sizeof(struct csv));
 
+    //parse the format string to initialize total_columns
+    csvfile->total_columns = calc_num_columns(csvfile, fmt, sep);
+    assert(csvfile->total_columns >= 1);
+
+    //parse the format string to initialize column_formats array
+    csvfile->column_formats = infer_data_types(csvfile, fmt, sep);
+    assert(csvfile->column_formats != NULL);
+
+    #ifdef DEBUG
+    printf("csv_create() has finished.\n\n");
+    printf("total number of columns: %d\n\n", csvfile->total_columns);
+
+    for(size_t i = 0; i < csvfile -> total_columns; ++i)
+    {
+        printf("column %d is %c\n", (int) i, csvfile->column_formats[i]);
+    }
+    #endif
+
+    return csvfile;
 }
 
 //destructor
 void csv_destroy(struct csv *csvfile)
 {
-
+    free(csvfile->column_formats);
+    free(csvfile);
 }
 
 /*******************************************************************************
 * private functions
 *******************************************************************************/
 
-//determine number of columns and their data types
-void handle_fmt_string(char *fmt, char sep)
+//determine number of columns
+static int calc_num_columns(struct csv *csvfile, char *fmt, char sep)
 {
+    assert(csvfile != NULL);
     assert(fmt != NULL);
     assert(sep != 0);
 
-    //first I need the total number of columns
-    //starts at 1 since we dont use comma after the final column specifier
+    //starts at 1 since no comma after the final specifier
     int total_columns = 1;
 
     for(char *curr = fmt; *curr != '\0'; ++curr)
     {
-        if (*curr == sep)
-        {
-            ++total_columns;
-        }
+        if (*curr == sep) ++total_columns;
     }
-    assert(total_columns >= 1);
 
-    //now I need to extract the column format specifiers for later use.
-    //this is NOT a string
-    char *column_formats = malloc(total_columns);
+    assert(total_columns >= 1);
+    return total_columns;
+}
+
+//determine data type of each column
+static char *infer_data_types(struct csv *csvfile, char *fmt, char sep)
+{
+    assert(csvfile != NULL);
+    assert(fmt != NULL);
+    assert(sep != 0);
+
+    int loc = 0;
+
+    //allocate memory to hold data type formats, based on calc_num_columns()
+    assert(csvfile->total_columns >= 1);
+    char *column_formats = malloc(csvfile->total_columns);
     if (column_formats == NULL)
     {
         fprintf(stderr, "malloc failed in %s in %s", __func__, __FILE__);
         exit(EXIT_FAILURE);
     }
 
+    //loop through format string and copy over each format specifier
+    for(char *curr = fmt; *curr != '\0'; ++curr)
     {
-        int loc = 0;
-
-        for(char *curr = fmt; *curr != '\0'; ++curr)
+        if (*curr == '%')
         {
-            if (*curr == '%')
-            {
-                column_formats[loc++] = *(curr + 1);
-                assert(loc <= total_columns);
-            }
+            column_formats[loc++] = *(curr + 1);
+            assert(loc <= csvfile->total_columns);
         }
-        assert(loc == total_columns);
     }
+    assert(loc == csvfile->total_columns);
 
-    //debugging shit
-    printf("total columns is %d\n\n", total_columns);
-    for(size_t i = 0; i < total_columns; ++i)
-        printf("column %d is format %c\n", (int) i, column_formats[i]);
-    free(column_formats);
+    return column_formats;
 }
