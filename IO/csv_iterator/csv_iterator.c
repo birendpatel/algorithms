@@ -9,13 +9,46 @@
 #include <assert.h>
 #include "csv_iterator.h"
 
-//fmt string is something like "%d,%d,%c,%f"
-//for simplification, only accepts % followed by one character (f,d,s,c)
+/*******************************************************************************
+* structure: struct csv
+* purpose: holds CSV metadata
+*******************************************************************************/
 
-//from this I need to extract the total number of columns, and extract the
-//format specifiers individually for later use. total number of cols used
-//to malloc an array to hold each next'd row.
+struct csv
+{
+    int total_columns;
+    char *column_formats;
+};
 
+/*******************************************************************************
+* private function: handle_fmt_string
+* purpose: determine number of columns and their data types
+* @ fmt : format string passed by user on contructor
+* @ sep : separating chacter passed by user on constructor
+*******************************************************************************/
+void handle_fmt_string(char *fmt, char sep);
+
+/*******************************************************************************
+* public functions
+*******************************************************************************/
+
+//constructor
+struct csv *csv_create(char* filename, char *fmt, char sep)
+{
+
+}
+
+//destructor
+void csv_destroy(struct csv *csvfile)
+{
+
+}
+
+/*******************************************************************************
+* private functions
+*******************************************************************************/
+
+//determine number of columns and their data types
 void handle_fmt_string(char *fmt, char sep)
 {
     assert(fmt != NULL);
@@ -48,7 +81,7 @@ void handle_fmt_string(char *fmt, char sep)
 
         for(char *curr = fmt; *curr != '\0'; ++curr)
         {
-        ''    if (*curr == '%')
+            if (*curr == '%')
             {
                 column_formats[loc++] = *(curr + 1);
                 assert(loc <= total_columns);
