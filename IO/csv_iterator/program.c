@@ -2,7 +2,12 @@
 
 int main(void)
 {
-    handle_fmt_string("%d,%d,%f,%s", ',');
+    struct csv *data = csv_create("data.csv", "%d,%f,%s", ',');
 
-    return 0;
+    csv_next(data);
+    csv_next(data);
+    csv_next(data);
+    csv_next(data);
+
+    csv_destroy(data);
 }
