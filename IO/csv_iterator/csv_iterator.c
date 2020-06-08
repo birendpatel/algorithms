@@ -92,7 +92,7 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
     csvfile->sep[0] = sep;
     csvfile->sep[1] = '\0';
 
-    #ifdef CSV_ITERATOR_DEBUG
+    #if CSV_ITERATOR_DEBUG
     printf("csv_create() has finished.\n\n");
     printf("total number of columns: %d\n\n", csvfile->total_columns);
 
@@ -109,10 +109,31 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
 }
 
 //destructor
-void csv_destroy(struct csv *csvfile)
+void csv_destroy(struct csv *csvfile, int flush_curr)
 {
-    #ifdef CSV_ITERATOR_DEBUG
-    printf("\n\nreleasing all memory blocks.\n");
+    if (flush_curr == 1)
+    {
+        if (csvfile->curr_row != 0) //avoid attempting to free if no loads yet
+        {
+            #if CSV_ITERATOR_DEBUG
+            printf("\n\nreleasing currently loaded row.\n");
+            #endif
+
+            for(size_t i = 0; i < csvfile->total_columns; ++i)
+            {
+                free(csvfile->data[i]);
+            }
+        }
+        else
+        {
+            #if CSV_ITERATOR_DEBUG
+            printf("\n\ncannot release current row, none loaded.\n");
+            #endif
+        }
+    }
+
+    #if CSV_ITERATOR_DEBUG
+    printf("releasing all other memory blocks.\n");
     #endif
 
     fclose(csvfile->file_ptr);
@@ -122,7 +143,7 @@ void csv_destroy(struct csv *csvfile)
 }
 
 //load the next available row from the csv into memory
-void csv_next(struct csv *csvfile)
+int csv_next(struct csv *csvfile)
 {
     assert(csvfile != NULL);
     assert(csvfile->total_columns >= 1);
@@ -141,18 +162,21 @@ void csv_next(struct csv *csvfile)
 
     //set up a temporary buffer to hold next line in csv
     char *buffer = malloc(CSV_ITERATOR_BUF_LEN);
-    VERIFY_POINTER(malloc, buffer);
+    if (buffer == NULL)
+    {
+        return 0;
+    }
 
     //read the next line
     char *current_line = fgets(buffer, CSV_ITERATOR_BUF_LEN, csvfile->file_ptr);
     VERIFY_POINTER(fgets, current_line);
-    #ifdef CSV_ITERATOR_DEBUG
+    #if CSV_ITERATOR_DEBUG
     printf("\n\nloaded next line\n");
     #endif
 
     for(size_t i = 0; i < csvfile->total_columns; ++i)
     {
-        #ifdef CSV_ITERATOR_DEBUG
+        #if CSV_ITERATOR_DEBUG
         printf("Searching for item %d\n", (int) i+1);
         #endif
 
@@ -181,18 +205,18 @@ void csv_next(struct csv *csvfile)
                 *i_ptr = strtol(item, NULL, 10);
                 csvfile->data[i] = i_ptr;
 
-                #ifdef CSV_ITERATOR_DEBUG
+                #if CSV_ITERATOR_DEBUG
                 printf("found int\n");
                 #endif
 
                 break;
 
             case 'c':
-                i_ptr = malloc(sizeof(int));
-                *i_ptr = strtol(item, NULL, 10);
-                csvfile->data[i] = i_ptr;
+                c_ptr = malloc(1);
+                *c_ptr = *item;
+                csvfile->data[i] = c_ptr;
 
-                #ifdef CSV_ITERATOR_DEBUG
+                #if CSV_ITERATOR_DEBUG
                 printf("found char\n");
                 #endif
 
@@ -203,7 +227,7 @@ void csv_next(struct csv *csvfile)
                 *d_ptr = strtod(item, NULL);
                 csvfile->data[i] = d_ptr;
 
-                #ifdef CSV_ITERATOR_DEBUG
+                #if CSV_ITERATOR_DEBUG
                 printf("found double\n");
                 #endif
 
@@ -214,7 +238,7 @@ void csv_next(struct csv *csvfile)
                 strcpy(c_ptr, item);
                 csvfile->data[i] = c_ptr;
 
-                #ifdef CSV_ITERATOR_DEBUG
+                #if CSV_ITERATOR_DEBUG
                 printf("found string\n");
                 #endif
 
@@ -227,10 +251,12 @@ void csv_next(struct csv *csvfile)
 
     //release memory block occupied by buffer to keep resource demands low
     free(buffer);
+
+    return 1;
 }
 
 //access an item from the row currently loaded into memory
-void *curr_row_get_item(struct csv *csvfile, int index)
+void *csv_get_ptr(struct csv *csvfile, int index)
 {
     assert(csvfile != NULL);
     assert(index >= 0 && index < csvfile->total_columns);
