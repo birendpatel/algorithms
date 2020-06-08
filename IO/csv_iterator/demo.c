@@ -41,7 +41,7 @@ int main(void)
         printf("%d, ", item_1);
         printf("%g, ", item_2);
         printf("%s, ", item_3);
-        printf("%c, \n", item_4);
+        printf("%c \n", item_4);
     }
 
     //don't forget to destroy the type after you're done.
