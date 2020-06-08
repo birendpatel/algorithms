@@ -1,8 +1,6 @@
 /*
 * author: Biren Patel
-* description: API for python-style row iterator from CSV file.
-*
-* This API allows you to load a single row at a time into memory from a CSV
+* description: This API loads a single row at a time into memory from a CSV
 * file. The data is converted automatically to the data types that you request
 * through a format string. See demo.c for an example. You can then access the
 * contents of the current row, or flush it from memory and immediately load
@@ -17,15 +15,13 @@
 #ifndef CSV_ITERATOR_H
 #define CSV_ITERATOR_H
 
+#include <stdbool.h>
+
 /*******************************************************************************
 * client-modifiable parameters
-* @ CSV_ITERATOR_BUF_LEN : a temporary buffer to hold the raw contents of a
-*   single csv row. This temporary buffer only occupies memory during the
-*   csv_next() call. The default is 64 bytes.
-* @ CSV_ITERATOR_DEBUG : display debugging results in stdout
+* @ CSV_ITERATOR_BUF_LEN : temp buffer holds raw contents of csv row, in bytes.
 *******************************************************************************/
 #define CSV_ITERATOR_BUF_LEN 64
-#define CSV_ITERATOR_DEBUG 0
 
 /*******************************************************************************
 * structure: struct csv
@@ -35,6 +31,9 @@ struct csv;
 
 /*******************************************************************************
 * public function: csv_create
+* @ filename : path for CSV file
+* @ fmt : string specifiying format of a single row in the CSV file
+* @ sep : separator between data items in CSV, must be same separator in fmt
 * purpose: constructor
 *******************************************************************************/
 struct csv *csv_create(char* filename, char *fmt, char sep);
@@ -44,17 +43,26 @@ struct csv *csv_create(char* filename, char *fmt, char sep);
 * purpose: destructor
 * @ csvfile : pointer to struct csv to destroy
 * @ flush_curr : if you have not cycled through entire csv until EOF, set this
-*   to 1 to release memory held by the currently loaded csv row.
+*   to true to release memory held by the currently loaded csv row.
+* note: defaulting flush_curr to true is memory-safe.
 *******************************************************************************/
-void csv_destroy(struct csv *csvfile, int flush_curr);
+void csv_destroy(struct csv *csvfile, bool flush_curr);
 
 /*******************************************************************************
 * public function: csv_next
 * purpose: load the next available row from the csv into memory
 * @ csvfile : pointer to struct csv
-* returns: 1 if successful load, 0 if failure
+* returns: 1 if successful load, 0 if failure to read next line
 *******************************************************************************/
-int csv_next(struct csv *csvfile);
+bool csv_next(struct csv *csvfile);
+
+/*******************************************************************************
+* public function: csv_has_next
+* purpose: indicate if the CSV file still contains rows available to read
+* @ csvfile : pointer to struct csv
+* returns: 1 if at least one more row is available, 0 otherwise.
+*******************************************************************************/
+bool csv_has_next(struct csv *csvfile);
 
 /*******************************************************************************
 * public function: csv_get_ptr

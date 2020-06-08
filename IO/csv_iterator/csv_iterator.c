@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "csv_iterator.h"
 
 /*******************************************************************************
@@ -25,6 +26,10 @@
 
 /*******************************************************************************
 * structure: struct csv
+* @ file_ptr : pointer to stdio FILE type
+* @ curr_row : pointer to the current row loaded in memory, 0 before first load
+* @ data_available : 0 if no data left to read, 1 otherwise.
+* @ sep : string used for row tokenization
 * @ total_columns : total columns in csv file
 * @ column_formats : array of data types of each column, encoded as characters
 * @ data : array of void pointers to one row of data, one pointer per column.
@@ -35,6 +40,7 @@ struct csv
 {
     FILE *file_ptr;
     int curr_row;
+    bool data_available;
     char sep[2];
     int total_columns;
     char *column_formats;
@@ -65,10 +71,8 @@ static char *infer_data_types(struct csv *csvfile, char *fmt, char sep);
 * public functions
 *******************************************************************************/
 
-//constructor
 struct csv *csv_create(char* filename, char *fmt, char sep)
 {
-    //pointer to be returned to client
     struct csv *csvfile = malloc(sizeof(struct csv));
 
     //parse the format string to initialize total_columns
@@ -87,70 +91,22 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
     csvfile->data = malloc(csvfile->total_columns * sizeof(void*));
     VERIFY_POINTER(malloc, csvfile->data);
 
-    //set current row index and separator, separator is string for strtok
+    //set remaining members, the separator is a string because of strtok
     csvfile->curr_row = 0;
+    csvfile->data_available = true;
     csvfile->sep[0] = sep;
     csvfile->sep[1] = '\0';
-
-    #if CSV_ITERATOR_DEBUG
-    printf("csv_create() has finished.\n\n");
-    printf("total number of columns: %d\n\n", csvfile->total_columns);
-
-    for(size_t i = 0; i < csvfile -> total_columns; ++i)
-    {
-        printf("column %d is %c\n", (int) i, csvfile->column_formats[i]);
-    }
-
-    printf("\ncurrent row: %d\n", csvfile->curr_row);
-    printf("separator: %s\n", csvfile->sep);
-    #endif
 
     return csvfile;
 }
 
-//destructor
-void csv_destroy(struct csv *csvfile, int flush_curr)
+/******************************************************************************/
+
+void csv_destroy(struct csv *csvfile, bool flush_curr)
 {
-    if (flush_curr == 1)
-    {
-        if (csvfile->curr_row != 0) //avoid attempting to free if no loads yet
-        {
-            #if CSV_ITERATOR_DEBUG
-            printf("\n\nreleasing currently loaded row.\n");
-            #endif
-
-            for(size_t i = 0; i < csvfile->total_columns; ++i)
-            {
-                free(csvfile->data[i]);
-            }
-        }
-        else
-        {
-            #if CSV_ITERATOR_DEBUG
-            printf("\n\ncannot release current row, none loaded.\n");
-            #endif
-        }
-    }
-
-    #if CSV_ITERATOR_DEBUG
-    printf("releasing all other memory blocks.\n");
-    #endif
-
-    fclose(csvfile->file_ptr);
-    free(csvfile->column_formats);
-    free(csvfile->data); //make sure pointed data gets free'd beforehand
-    free(csvfile);
-}
-
-//load the next available row from the csv into memory
-int csv_next(struct csv *csvfile)
-{
-    assert(csvfile != NULL);
-    assert(csvfile->total_columns >= 1);
-    assert(csvfile->curr_row >= 0);
-
-    //STAGE 1: free memory occupied by previous row, if not on first pass
-    if (csvfile->curr_row != 0)
+    //second test: avoid attempting to free if no loads yet
+    //third test: if test is false, csv_next() would have already performed free
+    if (flush_curr && csvfile->curr_row != 0 && csvfile->data_available == true)
     {
         for(size_t i = 0; i < csvfile->total_columns; ++i)
         {
@@ -158,28 +114,60 @@ int csv_next(struct csv *csvfile)
         }
     }
 
+    fclose(csvfile->file_ptr);
+    free(csvfile->column_formats);
+    free(csvfile->data); //make sure pointed data gets free'd beforehand
+    free(csvfile);
+}
+
+/******************************************************************************/
+
+bool csv_next(struct csv *csvfile)
+{
+    assert(csvfile != NULL);
+    assert(csvfile->total_columns >= 1);
+    assert(csvfile->curr_row >= 0);
+
+    //this clause is triggered after the user has been notified already that
+    //there is no data left to read, on the last call that they attempted. This
+    //clause will now trigger on all subsequent calls to prevent stage 1 from
+    //attempting to free memory blocks which haven't been allocated.
+    //there are also two assertion checks below as a measure of extra safety.
+    if (csvfile->data_available == false)
+    {
+        return false;
+    }
+
+    //STAGE 1: if not on very first load, free memory occupied by previous row
+    if (csvfile->curr_row != 0)
+    {
+        assert(csvfile->data_available == true);
+
+        for(size_t i = 0; i < csvfile->total_columns; ++i)
+        {
+            free(csvfile->data[i]);
+        }
+    }
+
     //STAGE 2: load next row from csv file into memory
+    assert(csvfile->data_available == true);
 
     //set up a temporary buffer to hold next line in csv
     char *buffer = malloc(CSV_ITERATOR_BUF_LEN);
-    if (buffer == NULL)
-    {
-        return 0;
-    }
+    VERIFY_POINTER(malloc, buffer)
 
     //read the next line
     char *current_line = fgets(buffer, CSV_ITERATOR_BUF_LEN, csvfile->file_ptr);
-    VERIFY_POINTER(fgets, current_line);
-    #if CSV_ITERATOR_DEBUG
-    printf("\n\nloaded next line\n");
-    #endif
+
+    //if reached end of CSV, flip flag in struct to notify csv_has_next().
+    if (current_line == NULL)
+    {
+        csvfile->data_available = false;
+        return false;
+    }
 
     for(size_t i = 0; i < csvfile->total_columns; ++i)
     {
-        #if CSV_ITERATOR_DEBUG
-        printf("Searching for item %d\n", (int) i+1);
-        #endif
-
         char *item;
 
         //get data from column i of current row, if clause is for strtok arg 1
@@ -193,7 +181,7 @@ int csv_next(struct csv *csvfile)
         }
         VERIFY_POINTER(tokenization, item);
 
-        //decide on format for current item and malloc into csvfile data
+        //fetch format for current item and then malloc into csvfile->data
         int *i_ptr;
         double *d_ptr;
         char *c_ptr;
@@ -204,44 +192,24 @@ int csv_next(struct csv *csvfile)
                 i_ptr = malloc(sizeof(int));
                 *i_ptr = strtol(item, NULL, 10);
                 csvfile->data[i] = i_ptr;
-
-                #if CSV_ITERATOR_DEBUG
-                printf("found int\n");
-                #endif
-
                 break;
 
             case 'c':
                 c_ptr = malloc(1);
                 *c_ptr = *item;
                 csvfile->data[i] = c_ptr;
-
-                #if CSV_ITERATOR_DEBUG
-                printf("found char\n");
-                #endif
-
                 break;
 
             case 'f':
                 d_ptr = malloc(sizeof(double));
                 *d_ptr = strtod(item, NULL);
                 csvfile->data[i] = d_ptr;
-
-                #if CSV_ITERATOR_DEBUG
-                printf("found double\n");
-                #endif
-
                 break;
 
             case 's':
                 c_ptr = malloc(strlen(item) + 1);
                 strcpy(c_ptr, item);
                 csvfile->data[i] = c_ptr;
-
-                #if CSV_ITERATOR_DEBUG
-                printf("found string\n");
-                #endif
-
                 break;
         }
     }
@@ -252,10 +220,20 @@ int csv_next(struct csv *csvfile)
     //release memory block occupied by buffer to keep resource demands low
     free(buffer);
 
-    return 1;
+    return true;
 }
 
-//access an item from the row currently loaded into memory
+/******************************************************************************/
+bool csv_has_next(struct csv *csvfile)
+{
+    assert(csvfile != NULL);
+    assert(csvfile->data_available == true || csvfile->data_available == false);
+
+    return csvfile->data_available;
+}
+
+/******************************************************************************/
+
 void *csv_get_ptr(struct csv *csvfile, int index)
 {
     assert(csvfile != NULL);
@@ -263,11 +241,11 @@ void *csv_get_ptr(struct csv *csvfile, int index)
 
     return csvfile->data[index];
 }
+
 /*******************************************************************************
 * private functions
 *******************************************************************************/
 
-//determine number of columns
 static int calc_num_columns(struct csv *csvfile, char *fmt, char sep)
 {
     assert(csvfile != NULL);
@@ -286,7 +264,8 @@ static int calc_num_columns(struct csv *csvfile, char *fmt, char sep)
     return total_columns;
 }
 
-//determine data type of each column
+/******************************************************************************/
+
 static char *infer_data_types(struct csv *csvfile, char *fmt, char sep)
 {
     assert(csvfile != NULL);
