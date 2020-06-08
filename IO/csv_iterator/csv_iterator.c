@@ -112,7 +112,7 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
 void csv_destroy(struct csv *csvfile)
 {
     #ifdef CSV_ITERATOR_DEBUG
-    printf("\n\nreleasing all memory blocks.\n")
+    printf("\n\nreleasing all memory blocks.\n");
     #endif
 
     fclose(csvfile->file_ptr);
@@ -215,7 +215,7 @@ void csv_next(struct csv *csvfile)
                 csvfile->data[i] = c_ptr;
 
                 #ifdef CSV_ITERATOR_DEBUG
-                printf("found string");
+                printf("found string\n");
                 #endif
 
                 break;
@@ -229,6 +229,14 @@ void csv_next(struct csv *csvfile)
     free(buffer);
 }
 
+//access an item from the row currently loaded into memory
+void *curr_row_get_item(struct csv *csvfile, int index)
+{
+    assert(csvfile != NULL);
+    assert(index >= 0 && index < csvfile->total_columns);
+
+    return csvfile->data[index];
+}
 /*******************************************************************************
 * private functions
 *******************************************************************************/
