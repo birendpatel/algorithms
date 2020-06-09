@@ -250,7 +250,6 @@ static int calc_num_columns(struct csv *csvfile, char *fmt, char sep)
 {
     assert(csvfile != NULL);
     assert(fmt != NULL);
-    assert(sep != 0);
 
     //starts at 1 since no comma after the final specifier
     int total_columns = 1;
@@ -270,7 +269,6 @@ static char *infer_data_types(struct csv *csvfile, char *fmt, char sep)
 {
     assert(csvfile != NULL);
     assert(fmt != NULL);
-    assert(sep != 0);
 
     //allocate memory to hold data type formats, based on calc_num_columns()
     assert(csvfile->total_columns >= 1);
