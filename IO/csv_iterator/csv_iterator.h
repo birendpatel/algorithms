@@ -22,7 +22,7 @@
 * @ CSV_ITERATOR_DEBUG : set to 1 for verbose debugging output to stdout
 *******************************************************************************/
 #define CSV_ITERATOR_BUF_LEN 1024
-#define CSV_ITERATOR_DEBUG 1
+#define CSV_ITERATOR_DEBUG 0
 
 /*******************************************************************************
 * structure: struct csv

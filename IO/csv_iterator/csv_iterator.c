@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include "csv_iterator.h"
 
 /*******************************************************************************
@@ -48,24 +49,12 @@ struct csv
 };
 
 /*******************************************************************************
-* private function: calc_num_columns
-* purpose: determine number of columns based on supplied format string
+* private function: parse_format_string
+* purpose: use format string to determine number of columns and type of each
 * @ csvfile : pointer to struct csv
 * @ fmt : format string passed by user on contructor
-* @ sep : separating chacter passed by user on constructor
-* returns: total number of columns
 *******************************************************************************/
-static int calc_num_columns(struct csv *csvfile, char *fmt, char sep);
-
-/*******************************************************************************
-* private function: infer_data_types
-* purpose: determine data type of each column based on supplied format string
-* @ csvfile : pointer to struct csv
-* @ fmt : format string passed by user on contructor
-* @ sep : separating chacter passed by user on constructor
-* returns: char array where each element supplies format character for a switch
-*******************************************************************************/
-static char *infer_data_types(struct csv *csvfile, char *fmt, char sep);
+static void parse_format_string(struct csv *csvfile, char *fmt);
 
 /*******************************************************************************
 * private function: csv_destroy_row
@@ -91,13 +80,11 @@ static bool csv_convert_reserve(struct csv *csvfile, char *start_pos, int col);
 struct csv *csv_create(char* filename, char *fmt, char sep)
 {
     struct csv *csvfile = malloc(sizeof(struct csv));
+    VERIFY_POINTER(malloc, csvfile);
 
-    //parse the format string to initialize total_columns
-    csvfile->total_columns = calc_num_columns(csvfile, fmt, sep);
+    //read the format string to determine total columns and type of each
+    parse_format_string(csvfile, fmt);
     assert(csvfile->total_columns >= 1);
-
-    //parse the format string to initialize column_formats array
-    csvfile->column_formats = infer_data_types(csvfile, fmt, sep);
     assert(csvfile->column_formats != NULL);
 
     //open the csv file
@@ -117,7 +104,12 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
     printf("\n\n~~~~~ CSV_CREATE() FINISHED ~~~~~\n");
     printf("separator is: %c\n", csvfile->sep);
     printf("total columns is: %d\n", csvfile->total_columns);
-    printf("column formats is: %s\n\n", csvfile->column_formats);
+    printf("column formats is: ");
+    for (size_t i = 0; i < csvfile->total_columns; ++i)
+    {
+        printf("%c,", csvfile->column_formats[i]);
+    }
+    puts("");
     #endif
 
     return csvfile;
@@ -149,15 +141,6 @@ void csv_destroy(struct csv *csvfile, bool flush_curr)
 }
 
 /******************************************************************************/
-
-/*
-stage 2 in the below function is where the data type inference and missing value
-inference happens. Essentially, two pointers to the buffer (lag and lead) play
-a game of leapfrog with each other, hopping along points in the buffer at or
-just after a separator. lag sets the position of lead, after a terminating
-condition, lag leaps over lead to set its own new position and then lead
-leaps over lag. this cycle repeats until n items are found or reported missing.
-*/
 
 bool csv_next(struct csv *csvfile)
 {
@@ -276,49 +259,53 @@ void *csv_get_ptr(struct csv *csvfile, int index)
 * private functions
 *******************************************************************************/
 
-static int calc_num_columns(struct csv *csvfile, char *fmt, char sep)
+static void parse_format_string(struct csv *csvfile, char *fmt)
 {
     assert(csvfile != NULL);
     assert(fmt != NULL);
 
-    //starts at 1 since no comma after the final specifier
-    int total_columns = 1;
-
-    for(char *curr = fmt; *curr != '\0'; ++curr)
-    {
-        if (*curr == sep) ++total_columns;
-    }
-
-    assert(total_columns >= 1);
-    return total_columns;
-}
-
-/******************************************************************************/
-
-static char *infer_data_types(struct csv *csvfile, char *fmt, char sep)
-{
-    assert(csvfile != NULL);
-    assert(fmt != NULL);
-
-    //allocate memory to hold data type formats, based on calc_num_columns()
-    assert(csvfile->total_columns >= 1);
-    char *column_formats = malloc(csvfile->total_columns);
+    //column formats will be returned, to start just reserve a byte in heap
+    char *column_formats = malloc(1);
     VERIFY_POINTER(malloc, column_formats);
 
-    //loop through format string and copy over each format specifier
-    int loc = 0;
+    //loop through the format string
+    int num_curr_columns = 0;
+    int num_new_columns;
+    char new_character;
 
     for(char *curr = fmt; *curr != '\0'; ++curr)
     {
+        //the % symbol indicates that column information is incoming
         if (*curr == '%')
         {
-            column_formats[loc++] = *(curr + 1);
-            assert(loc <= csvfile->total_columns);
+            //after % we expect a number
+            ++curr;
+            num_new_columns = (int) strtol(curr, NULL, 10);
+
+            //after the number we expect a character
+            while(isdigit(*curr)) ++curr;
+            new_character = *curr;
+
+            //reallocate column_formats array
+            realloc(column_formats, num_curr_columns + num_new_columns);
+            VERIFY_POINTER(realloc, column_formats);
+
+            //and populate each new byte with the new character
+            size_t i = num_curr_columns;
+            while(i < num_curr_columns + num_new_columns)
+            {
+                column_formats[i] = new_character;
+                ++i;
+            }
+
+            //we add the new columns to a running total of columns found
+            num_curr_columns += num_new_columns;
         }
     }
-    assert(loc == csvfile->total_columns);
 
-    return column_formats;
+    //set struct members
+    csvfile->total_columns = num_curr_columns;
+    csvfile->column_formats = column_formats;
 }
 
 /******************************************************************************/

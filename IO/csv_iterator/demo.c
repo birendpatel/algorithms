@@ -11,9 +11,16 @@
 int main(void)
 {
     //use the format string to tell program how to interpret each row.
-    //% notifies program that a format type (d, f, s, or c) is incoming.
-    //the separator must be in the format string and must match parameter 3.
-    struct csv *file = csv_create("demo.csv", "%d,%f,%s,%c", ',');
+    //% notifies program that column information is incoming.
+    //the character indicates the column type and the number preceding the
+    //character indicates the number of columns of that type.
+
+    //i.e,. %300d%10f means we have 300 integer columns followed by 10 double
+    //columns.
+
+    //the spaces between column identifiers is optional, for readability.
+    //you can use any symbol besides space, even the separator.
+    struct csv *file = csv_create("demo.csv", "%1d %1f %1s %1c", ',');
 
     //if you call csv_next(), then it will load the next available row of data
     //into memory. it returns a boolean value to indicate a load was successful.
