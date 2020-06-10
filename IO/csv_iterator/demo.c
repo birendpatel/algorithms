@@ -10,43 +10,49 @@
 
 int main(void)
 {
-    //use the format string to tell program how to interpret each row
+    //use the format string to tell program how to interpret each row.
+    //% notifies program that a format type (d, f, s, or c) is incoming.
+    //the separator must be in the format string and must match parameter 3.
     struct csv *file = csv_create("demo.csv", "%d,%f,%s,%c", ',');
 
-    //we will use these variables to hold data in the currently loaded row.
-    //item 3 is of course a string, hence the char pointer.
-    int item_1;
-    double item_2;
-    char *item_3;
-    char item_4;
-
-    //make sure there is data available to read, csv_next() returns false if not.
-    //csv_has_next() has lazy evaluation, it doesn't know there is no data
-    //available to read until csv_next() actually attempts a read, so you cannot
-    //use it here in the while test in place of csv_next().
+    //if you call csv_next(), then it will load the next available row of data
+    //into memory. it returns a boolean value to indicate a load was successful.
+    //if false, there was nothing left to read. By default, a 1 KiB buffer is
+    //used to read each row. Change this macro in the header file if necessary.
     while(csv_next(file))
     {
-        //extract the data into our variables.
-        item_1 = csv_get(file, 0, int);
+        //struct csv stores all data via void pointers.
+
+        //get the void pointer storing data in column 0, and cast to your type
+        int *item_1;
+        item_1 = (int*) csv_get_ptr(file, 0);
+
+        //if you know a column never has missing data, you can use csv_get to
+        //instead get the value directly without the pointer headache. just
+        //pass the matching type in the third parameter.
+        double item_2;
         item_2 = csv_get(file, 1, double);
-        item_4 = csv_get(file, 3, char);
 
-        //csv_get_ptr could be used for all items, but it would be a nuisance
-        //to have to cast the void pointer and perform indirection. csv_get()
-        //does that for you if you provide the data type in the third parameter.
-        //strings must call csv_get_ptr()
-        item_3 = csv_get_ptr(file, 2);
+        //strings of course will always need a pointer
+        char *item_3;
+        item_3 = (char*) csv_get_ptr(file, 2);
 
-        //print current row to stdout to take a look at our results
-        printf("%d, ", item_1);
+        //nothing special here, just another example
+        char *item_4;
+        item_4 = (char*) csv_get_ptr(file, 3);
+
+        //lets print each row to stdout. But there is a catch.
+        //missing data is represented by a pointer to NULL.
+        //therefore, to avoid accidents, test for NULL before dereferencing
+        if (!item_1) printf(" , "); else printf("%d, ", *item_1);
         printf("%g, ", item_2);
-        printf("%s, ", item_3);
-        printf("%c \n", item_4);
+        if (!item_3) printf(" , "); else printf("%s, ", item_3);
+        if (!item_4) printf(" \n"); else printf("%c\n", *item_4);
     }
 
-    //don't forget to destroy the type after you're done.
-    //it's safe to set the flush_curr parameter to true, regardless of whether
-    //or not there is a current row in memory.
+    //destroy the type after you're done. it's safe to set the flush_curr
+    //parameter to true, regardless of whether or not there is a current row
+    //in memory.
     csv_destroy(file, false);
 
     return EXIT_SUCCESS;
