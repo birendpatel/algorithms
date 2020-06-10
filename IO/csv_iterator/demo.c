@@ -19,6 +19,7 @@ int main(void)
     //into memory. it returns a boolean value to indicate a load was successful.
     //if false, there was nothing left to read. By default, a 1 KiB buffer is
     //used to read each row. Change this macro in the header file if necessary.
+    //the buffer is only temporary for the duration of the csv_next() call.
     while(csv_next(file))
     {
         //struct csv stores all data via void pointers.
@@ -49,6 +50,9 @@ int main(void)
         if (!item_3) printf(" , "); else printf("%s, ", item_3);
         if (!item_4) printf(" \n"); else printf("%c\n", *item_4);
     }
+
+    //if there is no data available, another call of csv_next becomes a no-op.
+    csv_next(file);
 
     //destroy the type after you're done. it's safe to set the flush_curr
     //parameter to true, regardless of whether or not there is a current row

@@ -68,6 +68,23 @@ static int calc_num_columns(struct csv *csvfile, char *fmt, char sep);
 static char *infer_data_types(struct csv *csvfile, char *fmt, char sep);
 
 /*******************************************************************************
+* private function: csv_destroy_row
+* purpose: return the memory blocks held by the current row
+* @ csvfile : pointer to struct csv
+*******************************************************************************/
+static void csv_destroy_row(struct csv *csvfile);
+
+/*******************************************************************************
+* private function: csv_convert_reserve
+* purpose: convert an area in buffer to a specific data type and reserve memory
+* @ csvfile : pointer to struct csv
+* @ start_pos : pointer to a starting point in a buffer
+* @ col : current column undergoing conversion
+* returns: true if successful conversion and allocation, false otherwise.
+*******************************************************************************/
+static bool csv_convert_reserve(struct csv *csvfile, char *start_pos, int col);
+
+/*******************************************************************************
 * public functions
 *******************************************************************************/
 
@@ -97,7 +114,7 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
     csvfile->sep = sep;
 
     #if CSV_ITERATOR_DEBUG
-    printf("~~~~~ CSV_CREATE() FINISHED ~~~~~\n");
+    printf("\n\n~~~~~ CSV_CREATE() FINISHED ~~~~~\n");
     printf("separator is: %c\n", csvfile->sep);
     printf("total columns is: %d\n", csvfile->total_columns);
     printf("column formats is: %s\n\n", csvfile->column_formats);
@@ -111,27 +128,15 @@ struct csv *csv_create(char* filename, char *fmt, char sep)
 void csv_destroy(struct csv *csvfile, bool flush_curr)
 {
     #if CSV_ITERATOR_DEBUG
-    printf("~~~~~ CSV_DESTROY() ~~~~~\n\n");
+    printf("\n\n~~~~~ CSV_DESTROY() ~~~~~\n");
     #endif
 
     //second test: avoid attempting to free if no loads yet
     //third test: if test is false, csv_next() would have already performed free
-    //missing data points to null, but I safely assume free(NULL) is a no-op.
     if (flush_curr && csvfile->curr_row != 0 && csvfile->data_available == true)
     {
-        for(size_t i = 0; i < csvfile->total_columns; ++i)
-        {
-            #if CSV_ITERATOR_DEBUG
-            printf("freeing currently loaded row in memory\n");
-            #endif
-
-            free(csvfile->data[i]);
-        }
+        csv_destroy_row(csvfile);
     }
-
-    #if CSV_ITERATOR_DEBUG
-    printf("freeing struct members and struct csv\n");
-    #endif
 
     fclose(csvfile->file_ptr);
     free(csvfile->column_formats);
@@ -139,7 +144,7 @@ void csv_destroy(struct csv *csvfile, bool flush_curr)
     free(csvfile);
 
     #if CSV_ITERATOR_DEBUG
-    printf("finished freeing memory blocks\n");
+    printf("held memory blocks are now free\n");
     #endif
 }
 
@@ -154,8 +159,6 @@ condition, lag leaps over lead to set its own new position and then lead
 leaps over lag. this cycle repeats until n items are found or reported missing.
 */
 
-//PLEASE REFORMAT THIS FUNCTION, WAY TOO LONG, WAY TOO COUPLED.
-
 bool csv_next(struct csv *csvfile)
 {
     #if CSV_ITERATOR_DEBUG
@@ -166,46 +169,23 @@ bool csv_next(struct csv *csvfile)
     assert(csvfile->total_columns >= 1);
     assert(csvfile->curr_row >= 0);
 
-    //this clause is triggered after the user has been notified already that
-    //there is no data left to read (on the last call that they attempted). This
-    //clause will now trigger on all subsequent calls to prevent stage 1 from
-    //attempting to free memory blocks which haven't been allocated.
-    //there are also three assertion checks below as a measure of extra safety.
+    //early stopping if user was informed on last call that no data is available
     if (csvfile->data_available == false)
     {
         #if CSV_ITERATOR_DEBUG
-        printf("user already notified no data left to read, exiting early\n\n");
+        printf("user already notified no data remains, exiting early\n\n");
         #endif
         return false;
     }
 
-    //STAGE 1: if not on very first load, free memory occupied by previous row.
-    //missing data points to null, but I safely assume free(NULL) is a no-op.
+    //stage 1: if not on very first load, free memory occupied by previous row.
     if (csvfile->curr_row != 0)
     {
-        #if CSV_ITERATOR_DEBUG
-        printf("now entering stage 1\n");
-        #endif
-
-        assert(csvfile->data_available == true);
-
-        for(size_t i = 0; i < csvfile->total_columns; ++i)
-        {
-            #if CSV_ITERATOR_DEBUG
-            printf("freeing memory held by previous row\n");
-            #endif
-            free(csvfile->data[i]);
-        }
+        csv_destroy_row(csvfile);
     }
 
-    //STAGE 2: load next row from csv file into memory
-    #if CSV_ITERATOR_DEBUG
-    printf("now entering stage 2\n");
-    #endif
-
+    //stage 2: set up a temporary buffer to hold next line in csv
     assert(csvfile->data_available == true);
-
-    //set up a temporary buffer to hold next line in csv
     char *buffer = malloc(CSV_ITERATOR_BUF_LEN);
     VERIFY_POINTER(malloc, buffer)
 
@@ -220,7 +200,7 @@ bool csv_next(struct csv *csvfile)
         return false;
     }
 
-    //a bit paranoid to have a third availability check, but it doesn't hurt
+    //a final paranoid check for data availability
     assert(csvfile->data_available == true);
 
     //replace line feed in buffer with a null character
@@ -237,134 +217,49 @@ bool csv_next(struct csv *csvfile)
     char *lag = buffer;
     char *lead;
 
-    #if CSV_ITERATOR_DEBUG
-    printf("entering for loop to populate columns\n\n");
-    #endif
-
     //on each loop, load into memory the data from column i of the current row
     for(size_t i = 0; i < csvfile->total_columns; ++i)
     {
-        #if CSV_ITERATOR_DEBUG
-        printf("now on loop iteration: %d\n", (int) i);
-        printf("\tlag points to character: %c\n", *lag);
-        #endif
+        //replace the next separator on or ahead of lag with a null character
+        char *next_separator = strchr(lag, csvfile->sep);
+        if (next_separator != NULL) *next_separator = '\0';
 
-        //replace the next separator with a null character
-        char *next_null;
-        if ((next_null = strchr(lag, csvfile->sep)))
-        {
-            #if CSV_ITERATOR_DEBUG
-            printf("\tseparator was replaced with null character\n");
-            #endif
-
-            *next_null = '\0';
-        }
-
-        //track a pointer to this new null character
+        //track the lead pointer to this new null character
         lead = strchr(lag, '\0');
 
         #if CSV_ITERATOR_DEBUG
+        printf("now on loop iteration: %d\n", (int) i);
+        printf("\tlag points to character: %c\n", *lag);
         printf("\tlead points just before character: %c\n", *(lead+1));
         #endif
 
-        /*
-        A missing value may occur in three general places:
-            1. in the first column
-            2. in a middle column
-            3. in the last column
-
-        Each possibility leads to an anomalous and unique lag-lead relationship:
-            1. lag and lead point to the same address
-            2. lag points to the separator character
-            3. lag points to the null character
-
-        Those possibilities would hold at any location in this loop, but at this
-        specific location, after strchr() and after setting lead, every single
-        possibility leads to lag anomalously pointing to the null character.
-        */
+        //at this specific point in the loop, after lag and lead have been set,
+        //there is a missing value if lag points to the null character.
         if (*lag == '\0')
         {
             #if CSV_ITERATOR_DEBUG
-            printf("\tmissing value at location, moving to next iteration\n");
+            printf("\tmissing value, moving to next iteration\n");
             #endif
 
-            //void pointer stores NULL
+            //NULL indicates that there is a missing value
             csvfile->data[i] = NULL;
-
-            //advance lag for the next loop
             lag = lead + 1;
-
             continue;
         }
 
-        //else, use lead to fetch format for current value and malloc into data
-        char *c_ptr;
-        int *i_ptr;
-        double *d_ptr;
+        //no missing data, convert the item data type and reserve memory for it
+        bool status;
+        status = csv_convert_reserve(csvfile, lag, i);
+        assert(status == true);
 
-        switch (csvfile->column_formats[i])
-        {
-            case 'd':
-                i_ptr = malloc(sizeof(int));
-                *i_ptr = strtol(lag, NULL, 10);
-                csvfile->data[i] = i_ptr;
-                #if CSV_ITERATOR_DEBUG
-                printf("\tswitch found int of value: %d\n", *i_ptr);
-                #endif
-                break;
-
-            case 'c':
-                c_ptr = malloc(1);
-                *c_ptr = *lag;
-                csvfile->data[i] = c_ptr;
-                #if CSV_ITERATOR_DEBUG
-                printf("\tswitch found char of value: %c\n", *c_ptr);
-                #endif
-                break;
-
-            case 'f':
-                d_ptr = malloc(sizeof(double));
-                *d_ptr = strtod(lag, NULL);
-                csvfile->data[i] = d_ptr;
-                #if CSV_ITERATOR_DEBUG
-                printf("\tswitch found float of value: %g\n", *d_ptr);
-                #endif
-                break;
-
-            case 's':
-                c_ptr = malloc(strlen(lag) + 1);
-                strcpy(c_ptr, lag);
-                csvfile->data[i] = c_ptr;
-                #if CSV_ITERATOR_DEBUG
-                printf("\tswitch found int of value: %s\n", c_ptr);
-                #endif
-                break;
-        }
-
-        //advance lag for the next loop
+        //lag leaps over lead to new position before start of next iteration.
         lag = lead + 1;
-        #if CSV_ITERATOR_DEBUG
-        printf("\tlag is advanced before lead, points to: %c\n", *lag);
-        #endif
+        assert(lag == lead + 1);
     }
-
-
-    #if CSV_ITERATOR_DEBUG
-    printf("now exiting call of csv next\n\n");
-    #endif
 
     ++csvfile->curr_row;
     free(buffer);
     return true;
-}
-
-/******************************************************************************/
-bool csv_has_next(struct csv *csvfile)
-{
-    assert(csvfile != NULL);
-    assert(csvfile->data_available == true || csvfile->data_available == false);
-
-    return csvfile->data_available;
 }
 
 /******************************************************************************/
@@ -424,4 +319,89 @@ static char *infer_data_types(struct csv *csvfile, char *fmt, char sep)
     assert(loc == csvfile->total_columns);
 
     return column_formats;
+}
+
+/******************************************************************************/
+
+static void csv_destroy_row(struct csv *csvfile)
+{
+    assert(csvfile != NULL);
+    assert(csvfile->data_available == true);
+
+    for(size_t i = 0; i < csvfile->total_columns; ++i)
+    {
+        #if CSV_ITERATOR_DEBUG
+        printf("freeing memory held by previous row\n");
+        #endif
+
+        free(csvfile->data[i]);
+    }
+}
+
+/******************************************************************************/
+
+static bool csv_convert_reserve(struct csv *csvfile, char *start_pos, int col)
+{
+    bool status = false;
+
+    int *i_ptr;
+    char *c_ptr;
+    double *d_ptr;
+
+    switch (csvfile->column_formats[col])
+    {
+        case 'd':
+                i_ptr = malloc(sizeof(int));
+                VERIFY_POINTER(malloc, i_ptr);
+                *i_ptr = strtol(start_pos, NULL, 10);
+                csvfile->data[col] = i_ptr;
+
+                #if CSV_ITERATOR_DEBUG
+                printf("\tswitch found int of value: %d\n", *i_ptr);
+                #endif
+
+                status = true;
+                break;
+
+        case 'c':
+                c_ptr = malloc(1);
+                VERIFY_POINTER(malloc, c_ptr);
+                *c_ptr = *start_pos;
+                csvfile->data[col] = c_ptr;
+
+                #if CSV_ITERATOR_DEBUG
+                printf("\tswitch found char of value: %c\n", *c_ptr);
+                #endif
+
+                status = true;
+                break;
+
+        case 'f':
+                d_ptr = malloc(sizeof(double));
+                VERIFY_POINTER(malloc, d_ptr);
+                *d_ptr = strtod(start_pos, NULL);
+                csvfile->data[col] = d_ptr;
+
+                #if CSV_ITERATOR_DEBUG
+                printf("\tswitch found float of value: %g\n", *d_ptr);
+                #endif
+
+                status = true;
+                break;
+
+        case 's':
+                c_ptr = malloc(strlen(start_pos) + 1);
+                VERIFY_POINTER(malloc, c_ptr);
+                strcpy(c_ptr, start_pos);
+                csvfile->data[col] = c_ptr;
+
+                #if CSV_ITERATOR_DEBUG
+                printf("\tswitch found int of value: %s\n", c_ptr);
+                #endif
+
+                status = true;
+                break;
+    }
+
+    return status;
 }
