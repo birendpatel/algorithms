@@ -3,13 +3,12 @@
 * description: This API loads a single row at a time into memory from a CSV
 * file. The data is converted automatically to the data types that you request
 * through a format string. See demo.c for an example. You can then access the
-* contents of the current row, or flush it from memory and immediately load
+* contents of the current row, or flush it from memory to immediately load
 * the next row. The goal of this API is to obtain some functionality and memory
 * efficiency similar to a python generator.
 *
-* note: does not yet handle csv with missing fields
 * note: does not yet handle csv with header
-* note: does not yet handle data types beyond (int, double, char, string)
+* note: only handles data types int (%d), double (%f), char(%c), and string (%s)
 */
 
 #ifndef CSV_ITERATOR_H
@@ -19,9 +18,11 @@
 
 /*******************************************************************************
 * client-modifiable parameters
-* @ CSV_ITERATOR_BUF_LEN : temp buffer holds raw contents of csv row, in bytes.
+* @ CSV_ITERATOR_BUF_LEN : 1 KiB temp buffer holds raw contents of a csv row
+* @ CSV_ITERATOR_DEBUG : set to 1 for verbose debugging output to stdout
 *******************************************************************************/
-#define CSV_ITERATOR_BUF_LEN 64
+#define CSV_ITERATOR_BUF_LEN 1024
+#define CSV_ITERATOR_DEBUG 0
 
 /*******************************************************************************
 * structure: struct csv
@@ -61,6 +62,8 @@ bool csv_next(struct csv *csvfile);
 * purpose: indicate if the CSV file still contains rows available to read
 * @ csvfile : pointer to struct csv
 * returns: 1 if at least one more row is available, 0 otherwise.
+* note: this has lazy evaluation and doesn't know there is no data available to
+*       read until csv_next() actually attempts a read.
 *******************************************************************************/
 bool csv_has_next(struct csv *csvfile);
 
@@ -70,7 +73,8 @@ bool csv_has_next(struct csv *csvfile);
 * @ csvfile : pointer to struct csv
 * @ index : index of item pointer in the struct csv data array
 * returns: void pointer to the item at the requested index
-* note: csv_get macro is better, unless you need a pointer or item is string
+* note: csv_get macro is better, but you must use this function if item is a
+*       string or if the CSV file contains missing data.
 *******************************************************************************/
 void *csv_get_ptr(struct csv *csvfile, int index);
 
@@ -80,7 +84,9 @@ void *csv_get_ptr(struct csv *csvfile, int index);
 * @ struct_csv_pointer : pointer to struct csv
 * @ index : index of item pointer in the struct csv data array
 * @ dtype : data type of item to be returned.
-* note: not suitable for strings, use csv_get_ptr with char* cast.
+* note: do not use if the CSV contains missing data, you could dereference a
+*       pointer to NULL. use csv_get_ptr instead and test for NULL before
+*       attempting to derefence.
 *******************************************************************************/
 #define csv_get(struct_csv_pointer, index, dtype)                              \
         *((dtype *) csv_get_ptr(struct_csv_pointer, index))                    \
