@@ -1,6 +1,6 @@
 /*
 * author: Biren Patel
-* description: CSV utilities
+* description: command line program for CSV utilities
 */
 
 #include <stdio.h>
@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <stdbool.h>
 
+#define BUFFER_LEN 2048
+
 /*******************************************************************************
 * function prototypes
 *******************************************************************************/
@@ -16,18 +18,23 @@
 void display_instructions(void);
 int get_user_code(void);
 
-bool csv_replace_sep(FILE *csvfile, char old, char new);
-bool csv_add_missing_commas_tail(FILE *csvfile);
+bool csv_replace_sep(FILE *csvfile, FILE *newfile);
+bool csv_add_missing_commas_tail(FILE *csvfile, FILE *newfile);
 
 /******************************************************************************/
 
 int main(int argc, char **argv)
 {
     //open file with supplied user argument
-    FILE *csvfile = fopen(argv[1], "r+");
-    if (csvfile == NULL)
+    FILE *csvfile = fopen(argv[1], "r");
+
+    //open file to place new contents
+    FILE *newfile = fopen(argv[2], "w");
+
+    if (csvfile == NULL || newfile == NULL)
     {
-        printf("Ensure file exists at location.\nUsage: csv_utils <filename>");
+        printf("Ensure file exists at location.\n");
+        printf("Usage: csv_utils <filename> <filename>");
         exit(EXIT_FAILURE);
     }
 
@@ -35,26 +42,23 @@ int main(int argc, char **argv)
     while(true)
     {
         display_instructions();
+
         switch(get_user_code())
         {
-            case 0:
-                printf("Program terminated\n");
-                fclose(csvfile);
-                return EXIT_SUCCESS;
-
             case 1:
                 //replace separator
-                printf("selected 1\n");
+                csv_replace_sep(csvfile, newfile);
                 break;
 
             case 2:
                 //add missing commas
-                printf("selected 2\n");
+                csv_add_missing_commas_tail(csvfile, newfile);
                 break;
 
             default:
                 printf("Program terminated\n");
                 fclose(csvfile);
+                fclose(newfile);
                 return EXIT_SUCCESS;
         }
     }
@@ -91,13 +95,32 @@ int get_user_code(void)
 * function: csv_replace_sep
 * purpose: replace all instances of one separator with a different separator
 * @ csvfile : pointer to file object
-* @ old : the current separator
-* @ new : the replacement separator
 * returns : true if successful, false otherwise
 *******************************************************************************/
-bool csv_replace_sep(FILE *csvfile, char old, char new)
+bool csv_replace_sep(FILE *csvfile, FILE *newfile)
 {
+    char old, new;
+    char buffer[BUFFER_LEN];
 
+    printf("Enter the current separator: ");
+    old = getchar();
+    while(getchar() != '\n');
+
+    printf("Enter the replacement separator: ");
+    new = getchar();
+    while(getchar() != '\n');
+
+    while(fgets(buffer, BUFFER_LEN, csvfile))
+    {
+        char *next_sep = buffer;
+        while((next_sep = strchr(buffer, old)))
+        {
+            *next_sep = new;
+        }
+        fputs(buffer, newfile);
+    }
+
+    return true;
 }
 
 /*******************************************************************************
@@ -106,7 +129,7 @@ bool csv_replace_sep(FILE *csvfile, char old, char new)
 * @ csvfile : pointer to file object
 * returns : true if successful, false otherwise
 *******************************************************************************/
-bool csv_add_missing_commas_tail(FILE *csvfile)
+bool csv_add_missing_commas_tail(FILE *csvfile, FILE *newfile)
 {
-
+    return true;
 }
