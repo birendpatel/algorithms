@@ -52,12 +52,16 @@ int main(int argc, char **argv)
         switch(get_user_code())
         {
             case 1:
-                //replace separator
-                csv_replace_sep();
-                printf(">>> requested changes are complete.");
+                //show instructions again
+                display_instructions();
                 break;
 
             case 2:
+                //replace separator
+                csv_replace_sep();
+                break;
+
+            case 3:
                 //add missing commas
                 csv_add_missing_commas_tail();
                 break;
@@ -81,8 +85,9 @@ void display_instructions(void)
     printf("\n|-----------------------------------------------------------|");
     printf("\n\n\t\tCodes\tPurpose\n\t\t-----\t-----------------\n");
     printf("\t\t  0  \texit program\n");
-    printf("\t\t  1  \treplace separator\n");
-    printf("\t\t  2  \tadd missing commas\n");
+    printf("\t\t  1  \tclear screen\n");
+    printf("\t\t  2  \treplace separator\n");
+    printf("\t\t  3  \tadd missing commas\n");
     printf("\n|-----------------------------------------------------------|");
 }
 
@@ -146,6 +151,7 @@ void csv_replace_sep(void)
 
     fclose(newfile);
     swap_files();
+    printf(">>> requested changes are complete.\n");
 }
 
 /*******************************************************************************
@@ -156,5 +162,60 @@ void csv_replace_sep(void)
 *******************************************************************************/
 void csv_add_missing_commas_tail(void)
 {
+    //in user file find the maximum commas that currently exist on single line
+    int max_commas = 0;
+    char buffer[BUFFER_LEN];
 
+    while(fgets(buffer, BUFFER_LEN, csvfile))
+    {
+        int curr_commas = 0;
+
+        for(char *curr = buffer; *curr != '\0'; ++curr)
+        {
+            if (*curr == ',') ++curr_commas;
+        }
+
+        if (curr_commas > max_commas) max_commas = curr_commas;
+    }
+
+    //start again at the top and add x amount of commas if missing
+    rewind(csvfile);
+    FILE *newfile = fopen(TEMP_FILENAME, "w");
+
+    while(fgets(buffer, BUFFER_LEN, csvfile))
+    {
+
+        int curr_commas = 0;
+
+        for(char *curr = buffer; *curr != '\0'; ++curr)
+        {
+            if (*curr == ',') ++curr_commas;
+        }
+
+        int missing_commas = max_commas - curr_commas;
+
+        if (missing_commas > 0)
+        {
+            if (strchr(buffer, '\n'))
+            {
+                buffer[strcspn(buffer, "\n")] = '\0';
+            }
+
+            char comma_str[missing_commas + 2];
+            for(size_t i = 0; i < missing_commas + 1; ++i)
+            {
+                comma_str[i] = (i == missing_commas ? '\n' : ',');
+            }
+            comma_str[missing_commas + 1] = '\0';
+
+            strcat(buffer, comma_str);
+        }
+
+        fputs(buffer, newfile);
+    }
+
+    fclose(newfile);
+    swap_files();
+    printf(">>> requested changes are complete.\n");
+    printf(">>> %d columns now exist in file.\n", max_commas + 1);
 }
