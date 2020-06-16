@@ -63,7 +63,7 @@ bool csv_next(struct csv *csvfile);
 * purpose: get pointer to an item in the current row
 * @ csvfile : pointer to struct csv
 * @ index : index of item pointer in the struct csv data array
-* returns: void pointer to the item at the requested index
+* returns: void pointer to item at the requested index, NULL if out of bounds
 * note: csv_get macro is better, but you must use this function if item is a
 *       string or if the CSV file contains missing data.
 *******************************************************************************/

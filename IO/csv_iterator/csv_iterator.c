@@ -250,9 +250,16 @@ bool csv_next(struct csv *csvfile)
 void *csv_get_ptr(struct csv *csvfile, int index)
 {
     assert(csvfile != NULL);
-    assert(index >= 0 && index < csvfile->total_columns);
+    assert(index >= 0);
 
-    return csvfile->data[index];
+    if (index < csvfile->total_columns)
+    {
+        return csvfile->data[index];
+    }
+    else
+    {
+        return NULL;
+    }
 }
 
 /*******************************************************************************
