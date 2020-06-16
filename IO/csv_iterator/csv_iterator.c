@@ -179,6 +179,7 @@ bool csv_next(struct csv *csvfile)
         printf("no data available to read, exiting early\n\n");
         #endif
 
+        free(buffer);
         csvfile->data_available = false;
         return false;
     }
