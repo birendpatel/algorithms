@@ -26,13 +26,13 @@
 * structure: vector
 * @ data : stores elements contained in vector
 * @ capacity : tracks the maximum size of the vector
-* @ index : tracks the number of elements held in the vector
+* @ length : tracks the number of elements held in the vector
 *******************************************************************************/
 struct vector
 {
     array_item *data;
     int capacity;
-    int index;
+    int length;
 };
 
 /*******************************************************************************
@@ -48,7 +48,7 @@ struct vector *vector_create(void)
     VERIFY_POINTER(malloc, vec->data);
 
     vec->capacity = VECTOR_START_CAPACITY;
-    vec->index = 0;
+    vec->length = 0;
 
     #ifdef VECTOR_DEBUG
     printf("--> vector created\n");
@@ -76,36 +76,36 @@ void vector_destroy(struct vector *vec)
 int vector_append(struct vector *vec, array_item element)
 {
     assert(vec != NULL);
-    assert(vec->capacity >= vec->index);
-    assert(vec->index >= 0 && vec->index <= vec->capacity);
+    assert(vec->capacity >= vec->length);
+    assert(vec->length >= 0 && vec->length <= vec->capacity);
 
     #ifdef VECTOR_DEBUG
     printf("--> appending element\n");
     #endif
-    
-    if (vec->index == vec->capacity)
+
+    if (vec->length == vec->capacity)
     {
         #ifdef VECTOR_DEBUG
         printf("--> increasing capacity to %d\n", VECTOR_GROW(vec->capacity));
         #endif
 
         vec->capacity = VECTOR_GROW(vec->capacity);
-        assert(vec->capacity >= vec->index);
+        assert(vec->capacity >= vec->length);
 
         vec->data = realloc(vec->data,  vec->capacity * sizeof(array_item));
         VERIFY_POINTER(realloc, vec->data);
     }
 
-    vec->data[vec->index++] = element;
+    vec->data[vec->length++] = element;
 
     #ifdef VECTOR_DEBUG
-    printf("--> top index now at %d\n", vec->index);
+    printf("--> length now at %d\n", vec->length);
     #endif
 
-    assert(vec->capacity >= vec->index);
-    assert(vec->index >= 0 && vec->index <= vec->capacity);
+    assert(vec->capacity >= vec->length);
+    assert(vec->length >= 0 && vec->length <= vec->capacity);
 
-    return vec->index;
+    return vec->length;
 }
 
 /******************************************************************************/
@@ -119,10 +119,10 @@ array_item *vector_get(struct vector *vec, int index)
     printf("--> fetching pointer to element at index %d\n", index);
     #endif
 
-    if (index > vec->index)
+    if (index >= vec->length)
     {
         #ifdef VECTOR_DEBUG
-        printf("--> index is out of bounds of current top\n");
+        printf("--> index is out of bounds of current length\n");
         #endif
 
         return NULL;
@@ -135,17 +135,55 @@ array_item *vector_get(struct vector *vec, int index)
 
 /******************************************************************************/
 
+int vector_set(struct vector *vec, int index, array_item element)
+{
+    assert(vec != NULL);
+    assert(index >= 0);
+
+    if (index >= vec->length)
+    {
+        #ifdef VECTOR_DEBUG
+        printf("--> attempted to change value at index %d, failed\n", index);
+        #endif
+
+        return 0;
+    }
+    else
+    {
+        #ifdef VECTOR_DEBUG
+        printf("--> attempted to change value at index %d, success\n", index);
+        #endif
+
+        vec->data[index] = element;
+        return 1;
+    }
+}
+
+/******************************************************************************/
+
 void vector_clear(struct vector *vec)
 {
     assert(vec != NULL);
 
     #ifdef VECTOR_DEBUG
-    printf("--> resetting index but memory allocation remains\n");
+    printf("--> resetting length but memory allocation remains\n");
     #endif
 
-    vec->index = 0;
+    vec->length = 0;
 
-    assert(vec->index == 0);
+    assert(vec->length == 0);
+}
+
+/******************************************************************************/
+
+int vector_len(struct vector *vec)
+{
+    #ifdef VECTOR_DEBUG
+    printf("--> getting current length of vector\n");
+    #endif
+
+    assert(vec != NULL);
+    return vec->length;
 }
 
 /******************************************************************************/
@@ -158,7 +196,7 @@ void vector_show(struct vector *vec)
     printf("--> printing vector contents to stdout\n");
     #endif
 
-    for (size_t i = 0; i < vec->index; ++i)
+    for (size_t i = 0; i < vec->length; ++i)
     {
         printf(FMT_STRING, vec->data[i]);
     }

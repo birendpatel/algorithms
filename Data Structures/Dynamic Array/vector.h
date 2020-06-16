@@ -59,11 +59,30 @@ int vector_append(struct vector *vec, array_item element);
 array_item *vector_get(struct vector *vec, int index);
 
 /*******************************************************************************
+* public function: vector_set
+* purpose: change an element value
+* @ vec : pointer to struct vector
+* @ index : index of desired element
+* @ element : new array item to take the place at index
+* returns: 1 if successful, 0 if not
+* note: index must be in bounds given current length of vector
+*******************************************************************************/
+int vector_set(struct vector *vec, int index, array_item element);
+
+/*******************************************************************************
 * public function: vector_clear
 * purpose: clear elements from a vector but keep gained attributes like capacity
 * @ vec : pointer to struct vector
 *******************************************************************************/
 void vector_clear(struct vector *vec);
+
+/*******************************************************************************
+* public function: vector_len
+* purpose: get total number of elements currently in vector
+* @ vec : pointer to struct vector
+* returns: total number of elements currently in vector
+*******************************************************************************/
+int vector_len(struct vector *vec);
 
 /*******************************************************************************
 * public function: vector_show
