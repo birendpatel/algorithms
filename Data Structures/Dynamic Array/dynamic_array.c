@@ -6,7 +6,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "vector.h"
+#include <stddef.h>
+#include <stdint.h>
+#include "dynamic_array.h"
+
+/*******************************************************************************
+* macro: darray_trace
+* purpose: debugging output if DYNAMIC_ARRAY_DEBUG == 1 from dynamic_array.h
+*******************************************************************************/
+
+#define DARRAY_TRACE(fmt, ...)                                                 \
+        do                                                                     \
+        {                                                                      \
+            if (DYNAMIC_ARRAY_DEBUG)                                           \
+            printf("\n--> %s (%d): " fmt, __func__, __LINE__, __VA_ARGS__);    \
+        } while(0)
 
 /*******************************************************************************
 * macro: verify_pointer
@@ -14,192 +28,100 @@
 * @ test : one word name of the test being performed
 * @ pointer : pointer returned by some function
 *******************************************************************************/
-
 #define VERIFY_POINTER(test, pointer)                                          \
         if (pointer == NULL)                                                   \
         {                                                                      \
             fprintf(stderr, #test " fail: %s in %s\n", __func__, __FILE__);    \
             exit(EXIT_FAILURE);                                                \
-        }                                                                      \
+        }
 
 /*******************************************************************************
-* structure: vector
-* @ data : stores elements contained in vector
-* @ capacity : tracks the maximum size of the vector
-* @ length : tracks the number of elements held in the vector
+* macro: darray_header_var
+* purpose: given pointer to struct member, get pointer to containing structure
 *******************************************************************************/
-struct vector
+#define DARRAY_HEADER_VAR(d)                                                   \
+        struct darray_header *dh = (struct darray_header *)                    \
+        ((int8_t*) d - offsetof(struct darray_header, data))
+
+/*******************************************************************************
+* structure: darray_header
+* purpose: hidden structure contains array metadata
+* @ cache : unused reserved block of 8 bytes
+* @ capacity : current maximum size of array
+* @ length : current number of elements held in array
+* @ data : stores elements contained in array
+
+            ----------#----------#----------#------------------
+            |  cache  # capacity #  length  #  data ---------->
+            ----------#----------#----------#------------------
+
+            \_____________________________/  \_______________/
+                    hidden metadata            exposed array
+
+* note: 16 byte header to ensure 0 pad in most specifications of array_item and
+* to prevent data member from occupying trailing padding after length. The cache
+* isn't necessary, but maintains the header packing up to 16 bit array items.
+*******************************************************************************/
+
+struct darray_header
 {
-    array_item *data;
-    int capacity;
-    int length;
+    double cache;
+    uint32_t capacity;
+    uint32_t length;
+    array_item data[];
 };
 
 /*******************************************************************************
 * public functions
 *******************************************************************************/
 
-struct vector *vector_create(void)
+darray darray_create(void)
 {
-    struct vector *vec = malloc(sizeof(struct vector));
-    VERIFY_POINTER(malloc, vec);
+    DARRAY_TRACE("creating dynamic array%c\n", ' ');
 
-    vec->data = malloc(VECTOR_START_CAPACITY * sizeof(array_item));
-    VERIFY_POINTER(malloc, vec->data);
+    assert(INIT_CAPACITY > 0);
 
-    vec->capacity = VECTOR_START_CAPACITY;
-    vec->length = 0;
+    //if some compiler left trailing padding after the header,
+    //then the flexible array may push back onto the trailing padding.
+    size_t array_size = sizeof(array_item) * INIT_CAPACITY;
+    size_t yes_pad = offsetof(struct darray_header, data) + array_size;
+    size_t no_pad = sizeof(struct darray_header) + array_size;
 
-    #ifdef VECTOR_DEBUG
-    printf("--> vector created\n");
-    #endif
+    DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n", (int)yes_pad, (int)no_pad);
 
-    return vec;
+    //malloc the cheaper option, but most of the time no_pad = yes_pad
+    struct darray_header *dh;
+    dh = yes_pad < no_pad ? malloc(yes_pad) : malloc(no_pad);
+    VERIFY_POINTER(malloc, dh);
+
+    //set members
+    dh->cache = 0.0;
+    dh->capacity = INIT_CAPACITY;
+    dh->length = 0;
+
+    DARRAY_TRACE("dynamic array created, %d elements\n", dh->capacity);
+    //expose array to client but keep the header hidden
+    return dh->data;
 }
 
 /******************************************************************************/
 
-void vector_destroy(struct vector *vec)
+void darray_destroy(darray d)
 {
-    assert(vec != NULL);
+    assert(d != NULL);
 
-    free(vec->data);
-    free(vec);
+    //creates pointer to containing structure by manipulating the input pointer
+    /* dh = */ DARRAY_HEADER_VAR(d);
 
-    #ifdef VECTOR_DEBUG
-    printf("--> destroyed vector\n");
-    #endif
-}
+    //just check that we actually arrived at the structure correctly
+    assert(dh->capacity);
+    assert(dh->data[0] == *d);
 
-/******************************************************************************/
+    DARRAY_TRACE("destroying dynamic array "
+                 "with attributes\n\tcache: %g\n\tcapacity: %d\n\tlength: %d\n",
+                 dh->cache, dh->capacity, dh->length);
 
-int vector_append(struct vector *vec, array_item element)
-{
-    assert(vec != NULL);
-    assert(vec->capacity >= vec->length);
-    assert(vec->length >= 0 && vec->length <= vec->capacity);
-
-    #ifdef VECTOR_DEBUG
-    printf("--> appending element\n");
-    #endif
-
-    if (vec->length == vec->capacity)
-    {
-        #ifdef VECTOR_DEBUG
-        printf("--> increasing capacity to %d\n", VECTOR_GROW(vec->capacity));
-        #endif
-
-        vec->capacity = VECTOR_GROW(vec->capacity);
-        assert(vec->capacity >= vec->length);
-
-        vec->data = realloc(vec->data,  vec->capacity * sizeof(array_item));
-        VERIFY_POINTER(realloc, vec->data);
-    }
-
-    vec->data[vec->length++] = element;
-
-    #ifdef VECTOR_DEBUG
-    printf("--> length now at %d\n", vec->length);
-    #endif
-
-    assert(vec->capacity >= vec->length);
-    assert(vec->length >= 0 && vec->length <= vec->capacity);
-
-    return vec->length;
-}
-
-/******************************************************************************/
-
-array_item *vector_get(struct vector *vec, int index)
-{
-    assert(vec != NULL);
-    assert(index >= 0);
-
-    #ifdef VECTOR_DEBUG
-    printf("--> fetching pointer to element at index %d\n", index);
-    #endif
-
-    if (index >= vec->length)
-    {
-        #ifdef VECTOR_DEBUG
-        printf("--> index is out of bounds of current length\n");
-        #endif
-
-        return NULL;
-    }
-    else
-    {
-        return vec->data + index;
-    }
-}
-
-/******************************************************************************/
-
-int vector_set(struct vector *vec, int index, array_item element)
-{
-    assert(vec != NULL);
-    assert(index >= 0);
-
-    if (index >= vec->length)
-    {
-        #ifdef VECTOR_DEBUG
-        printf("--> attempted to change value at index %d, failed\n", index);
-        #endif
-
-        return 0;
-    }
-    else
-    {
-        #ifdef VECTOR_DEBUG
-        printf("--> attempted to change value at index %d, success\n", index);
-        #endif
-
-        vec->data[index] = element;
-        return 1;
-    }
-}
-
-/******************************************************************************/
-
-void vector_clear(struct vector *vec)
-{
-    assert(vec != NULL);
-
-    #ifdef VECTOR_DEBUG
-    printf("--> resetting length but memory allocation remains\n");
-    #endif
-
-    vec->length = 0;
-
-    assert(vec->length == 0);
-}
-
-/******************************************************************************/
-
-int vector_len(struct vector *vec)
-{
-    #ifdef VECTOR_DEBUG
-    printf("--> getting current length of vector\n");
-    #endif
-
-    assert(vec != NULL);
-    return vec->length;
-}
-
-/******************************************************************************/
-
-void vector_show(struct vector *vec)
-{
-    assert(vec != NULL);
-
-    #ifdef VECTOR_DEBUG
-    printf("--> printing vector contents to stdout\n");
-    #endif
-
-    for (size_t i = 0; i < vec->length; ++i)
-    {
-        printf(FMT_STRING, vec->data[i]);
-    }
-
-    puts("");
+    //pointers are checking out okay, lets free the memory block
+    free(dh);
+    return;
 }
