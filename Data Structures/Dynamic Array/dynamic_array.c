@@ -46,26 +46,25 @@
 /*******************************************************************************
 * structure: darray_header
 * purpose: hidden structure contains array metadata
-* @ cache : unused reserved block of 8 bytes
+* @ cache : unused reserved block of 4 bytes
+* @ offset: stores offset of data FLA
 * @ capacity : current maximum size of array
 * @ length : current number of elements held in array
 * @ data : stores elements contained in array
 
-        #-----------#------------#------------#-------------------#
-        #   cache   #  capacity  #   length   #  data ----------> #
-        #-----------#------------#------------#-------------------#
+     #-----------#------------#------------#------------#-------------------#
+     #   cache   #   offset   #  capacity  #   length   #  data ----------> #
+     #-----------#------------#------------#------------#-------------------#
 
-        \___________________________________/  \_________________/
-                    hidden metadata              exposed array
+     \________________________________________________/  \_________________/
+                       hidden metadata                      exposed array
 
-* note: 16 byte header to ensure 0 pad in most specifications of array_item and
-* to prevent data member from occupying trailing padding after length member.
-* The cache is unused thus far.
 *******************************************************************************/
 
 struct darray_header
 {
-    double cache;
+    uint32_t cache;
+    uint32_t data_offset;
     uint32_t capacity;
     uint32_t length;
     array_item data[];
@@ -78,31 +77,31 @@ struct darray_header
 darray darray_create(void)
 {
     DARRAY_TRACE("creating dynamic array%c\n", ' ');
-
     assert(INIT_CAPACITY > 0);
 
-    //if some compiler left trailing padding after the header,
-    //then the flexible array may push back onto the trailing padding.
-    size_t array_size = sizeof(array_item) * INIT_CAPACITY;
-    size_t yes_pad = offsetof(struct darray_header, data) + array_size;
-    size_t no_pad = sizeof(struct darray_header) + array_size;
-
-    //16 bytes is absolute minimum if fully packed, > not >= b/c 1 element
-    assert(yes_pad > 16 && no_pad >  16);
-    DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n", (int)yes_pad, (int)no_pad);
-
-    //malloc the cheaper option, but most of the time no_pad = yes_pad
+    //client will receive dh->data but the rest of the struct will be hidden
     struct darray_header *dh;
-    dh = yes_pad < no_pad ? malloc(yes_pad) : malloc(no_pad);
+
+    //determine number of bytes needed for the flexible array member
+    size_t arr_size = sizeof(array_item) * INIT_CAPACITY;
+
+    //determine bytes needed for struct, accounting for possible trailing pad
+    size_t y_pad = offsetof(struct darray_header, data);
+    size_t n_pad = sizeof(struct darray_header);
+    DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n", (int) y_pad, (int) n_pad);
+
+    //malloc yes_pad number of bytes if FLA pushed back onto trailing pad
+    dh = y_pad < n_pad ? malloc(y_pad + arr_size) : malloc(n_pad + arr_size);
     VERIFY_POINTER(malloc, dh);
 
-    //set members
-    dh->cache = 0.0;
+    //define header metadata
+    dh->cache = 0;
+    dh->data_offset = y_pad < n_pad ? y_pad : n_pad;
     dh->capacity = INIT_CAPACITY;
     dh->length = 0;
 
-    DARRAY_TRACE("dynamic array created, %d elements\n", dh->capacity);
     //expose array to client but keep the header hidden
+    DARRAY_TRACE("dynamic array created, %d byte capacity\n", dh->capacity);
     return dh->data;
 }
 
@@ -119,8 +118,8 @@ void darray_destroy(darray d)
     assert(dh->data[0] == *d);
 
     DARRAY_TRACE("destroying dynamic array "
-                 "with attributes\n\tcache: %g\n\tcapacity: %d\n\tlength: %d\n",
-                 dh->cache, dh->capacity, dh->length);
+                 "with members\n\toffset: %d\n\tcapacity: %d\n\tlength: %d\n",
+                 (int) dh->data_offset, dh->capacity, dh->length);
 
     //pointers are checking out okay, lets free the memory block
     free(dh);
@@ -140,40 +139,38 @@ void darray_append(darray *d, array_item element)
     assert(dh->data[0] == **d);
     assert(dh->length >= 0 && dh->length <= dh->capacity);
 
-    DARRAY_TRACE("appending element%c\n", ' ');
+    DARRAY_TRACE("appending element to dynamic array%c\n", ' ');
 
+    //no space left in the allocated block to append the element
     if (dh->length == dh->capacity)
     {
-        DARRAY_TRACE("inc capacity to %d\n", INCREASE_CAPACITY(dh->capacity));
-
+        //determine new array capacity as a function of current capacity
         dh->capacity = INCREASE_CAPACITY(dh->capacity);
+
+        DARRAY_TRACE("increased capacity to %d\n", dh->capacity);
         assert(dh->capacity > dh->length);
 
-        //repeat the same check from constructor. SHOULD BE A FLAG IN STRUCT
-        size_t array_size = sizeof(array_item) * dh->capacity;
-        size_t yes_pad = offsetof(struct darray_header, data) + array_size;
-        size_t no_pad = sizeof(struct darray_header) + array_size;
+        //determine total bytes needed for header and data elements
+        size_t new_size = dh->data_offset + sizeof(array_item) * dh->capacity;
+        DARRAY_TRACE("new darray memory block of %d bytes\n", (int) new_size);
 
-        DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n",
-                     (int)yes_pad, (int)no_pad);
-
+        //reallocate memory and redirect dh pointer
         struct darray_header *tmp;
-        tmp = yes_pad < no_pad ? realloc(dh, yes_pad) : realloc(dh, no_pad);
+        tmp = realloc(dh, new_size);
         VERIFY_POINTER(realloc, tmp);
         dh = tmp;
     }
 
+    //space available in allocated block, go ahead and append element
     dh->data[dh->length++] = element;
 
-    //by now, its possible that realloc moved dh to a new section of memory.
-    //if so, the original darray d input would be pointing somwhere invalid.
-    //so let's update it just in case.
-    //this is why we accepted a pointer to a darray (array_item **)
+    //if realloc called, dh may have moved to a new section of memory.
+    //if so, need to dereference the input pointer and update address for client
     *d = dh->data;
 
     DARRAY_TRACE("length now at %d\n", dh->length);
     assert(dh->length >= 0 && dh->length <= dh->capacity);
-    assert(dh->capacity >= dh->length); //not eq unless client changes growth
+    assert(dh->capacity >= dh->length); //only equal if client changed growth fx
 }
 
 /******************************************************************************/
