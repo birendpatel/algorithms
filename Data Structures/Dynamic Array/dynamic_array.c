@@ -40,8 +40,8 @@
 * purpose: given pointer to struct member, get pointer to containing structure
 *******************************************************************************/
 #define DARRAY_HEADER_VAR(d)                                                   \
-        struct darray_header *dh = (struct darray_header *)                    \
-        ((int8_t*) d - offsetof(struct darray_header, data))
+        ((struct darray_header *)                                              \
+        ((int8_t*) d - offsetof(struct darray_header, data)))
 
 /*******************************************************************************
 * structure: darray_header
@@ -51,16 +51,16 @@
 * @ length : current number of elements held in array
 * @ data : stores elements contained in array
 
-            ----------#----------#----------#------------------
-            |  cache  # capacity #  length  #  data ---------->
-            ----------#----------#----------#------------------
+        #-----------#------------#------------#-------------------#
+        #   cache   #  capacity  #   length   #  data ----------> #
+        #-----------#------------#------------#-------------------#
 
-            \_____________________________/  \_______________/
-                    hidden metadata            exposed array
+        \___________________________________/  \_________________/
+                    hidden metadata              exposed array
 
 * note: 16 byte header to ensure 0 pad in most specifications of array_item and
-* to prevent data member from occupying trailing padding after length. The cache
-* isn't necessary, but maintains the header packing up to 16 bit array items.
+* to prevent data member from occupying trailing padding after length member.
+* The cache is unused thus far.
 *******************************************************************************/
 
 struct darray_header
@@ -87,6 +87,8 @@ darray darray_create(void)
     size_t yes_pad = offsetof(struct darray_header, data) + array_size;
     size_t no_pad = sizeof(struct darray_header) + array_size;
 
+    //16 bytes is absolute minimum if fully packed, > not >= b/c 1 element
+    assert(yes_pad > 16 && no_pad >  16);
     DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n", (int)yes_pad, (int)no_pad);
 
     //malloc the cheaper option, but most of the time no_pad = yes_pad
@@ -110,11 +112,10 @@ void darray_destroy(darray d)
 {
     assert(d != NULL);
 
-    //creates pointer to containing structure by manipulating the input pointer
-    /* dh = */ DARRAY_HEADER_VAR(d);
+    //define pointer to containing structure via the input pointer
+    struct darray_header *dh = DARRAY_HEADER_VAR(d);
 
-    //just check that we actually arrived at the structure correctly
-    assert(dh->capacity);
+    //check that we have the stucture
     assert(dh->data[0] == *d);
 
     DARRAY_TRACE("destroying dynamic array "
@@ -124,4 +125,84 @@ void darray_destroy(darray d)
     //pointers are checking out okay, lets free the memory block
     free(dh);
     return;
+}
+
+/******************************************************************************/
+
+void darray_append(darray d, array_item element)
+{
+    assert(d != NULL);
+
+    //define pointer to structure via the input pointer
+    struct darray_header *dh = DARRAY_HEADER_VAR(d);
+
+    //check that we have the stucture and check length in bounds
+    assert(dh->data[0] == *d);
+    assert(dh->length >= 0 && dh->length <= dh->capacity);
+
+    DARRAY_TRACE("appending element%c\n", ' ');
+
+    if (dh->length == dh->capacity)
+    {
+        DARRAY_TRACE("inc capacity to %d\n", INCREASE_CAPACITY(dh->capacity));
+
+        dh->capacity = INCREASE_CAPACITY(dh->capacity);
+        assert(dh->capacity > dh->length);
+
+        //repeat the same check from constructor. SHOULD BE A FLAG IN STRUCT
+        size_t array_size = sizeof(array_item) * dh->capacity;
+        size_t yes_pad = offsetof(struct darray_header, data) + array_size;
+        size_t no_pad = sizeof(struct darray_header) + array_size;
+
+        DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n", (int)yes_pad, (int)no_pad);
+
+        struct darray_header *tmp;
+        tmp = yes_pad < no_pad ? realloc(dh, yes_pad) : realloc(dh, no_pad);
+        VERIFY_POINTER(realloc, tmp);
+        dh = tmp;
+    }
+
+    dh->data[dh->length++] = element;
+
+    DARRAY_TRACE("length now at %d\n", dh->length);
+    assert(dh->length >= 0 && dh->length <= dh->capacity);
+    assert(dh->capacity >= dh->length); //not eq unless client changes growth
+}
+
+/******************************************************************************/
+
+int darray_len(darray d)
+{
+    assert(d != NULL);
+
+    //define pointer to containing structure via the input pointer
+    struct darray_header *dh = DARRAY_HEADER_VAR(d);
+
+    //check that we have the stucture and check length in bounds
+    assert(dh->data[0] == *d);
+    assert(dh->length >= 0 && dh->length <= dh->capacity);
+
+    DARRAY_TRACE("returning data length to client: %d elements", dh->length);
+    return dh->length;
+}
+
+/******************************************************************************/
+
+void darray_show(darray d)
+{
+    assert(d != NULL);
+
+    //define pointer to containing structure via the input pointer
+    struct darray_header *dh = DARRAY_HEADER_VAR(d);
+
+    //check that we have the structure
+    assert(dh->data[0] == *d);
+
+    //loop and print
+    for(size_t i = 0; i < dh->length; ++i)
+    {
+        printf(FMT_STRING, d[i]);
+    }
+
+    puts("");
 }

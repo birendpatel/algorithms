@@ -15,9 +15,9 @@
 *******************************************************************************/
 typedef int array_item;
 #define INCREASE_CAPACITY(n) (2 * n)
-#define INIT_CAPACITY 1
+#define INIT_CAPACITY 4
 #define FMT_STRING "%d "
-#define DYNAMIC_ARRAY_DEBUG 1
+#define DYNAMIC_ARRAY_DEBUG 0
 
 /*******************************************************************************
 * typedef: darray
@@ -36,8 +36,31 @@ darray darray_create(void);
 /*******************************************************************************
 * public function: darray_destroy
 * purpose: destructor
-* @ darr : pointer to first array_item in a dynamic array
+* @ d : pointer to first array_item in a dynamic array
 *******************************************************************************/
 void darray_destroy(darray d);
+
+/*******************************************************************************
+* public function: vector_append
+* purpose: append element to end of array
+* @ d : pointer to array item
+* @ element : array item to append
+*******************************************************************************/
+void darray_append(darray d, array_item element);
+
+/*******************************************************************************
+* public function: vector_len
+* purpose: get total number of elements currently in vector
+* @ d : pointer to array item
+* returns: total number of elements currently in vector
+*******************************************************************************/
+int darray_len(darray d);
+
+/*******************************************************************************
+* public function: vector_show
+* purpose: print vector contents to stdout
+* @ d : pointer to array item
+*******************************************************************************/
+void darray_show(darray d);
 
 #endif
