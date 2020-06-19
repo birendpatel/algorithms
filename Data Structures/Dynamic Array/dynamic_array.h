@@ -15,7 +15,7 @@
 *******************************************************************************/
 typedef int array_item;
 #define INCREASE_CAPACITY(n) (2 * n)
-#define INIT_CAPACITY 4
+#define INIT_CAPACITY 1
 #define FMT_STRING "%d "
 #define DYNAMIC_ARRAY_DEBUG 0
 
@@ -43,10 +43,10 @@ void darray_destroy(darray d);
 /*******************************************************************************
 * public function: vector_append
 * purpose: append element to end of array
-* @ d : pointer to array item
+* @ d : pointer to pointer to array item
 * @ element : array item to append
 *******************************************************************************/
-void darray_append(darray d, array_item element);
+void darray_append(darray *d, array_item element);
 
 /*******************************************************************************
 * public function: vector_len

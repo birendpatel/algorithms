@@ -41,7 +41,7 @@
 *******************************************************************************/
 #define DARRAY_HEADER_VAR(d)                                                   \
         ((struct darray_header *)                                              \
-        ((int8_t*) d - offsetof(struct darray_header, data)))
+        (((int8_t*) (d)) - offsetof(struct darray_header, data)))
 
 /*******************************************************************************
 * structure: darray_header
@@ -129,15 +129,15 @@ void darray_destroy(darray d)
 
 /******************************************************************************/
 
-void darray_append(darray d, array_item element)
+void darray_append(darray *d, array_item element)
 {
-    assert(d != NULL);
+    assert(d != NULL && *d != NULL);
 
-    //define pointer to structure via the input pointer
-    struct darray_header *dh = DARRAY_HEADER_VAR(d);
+    //define pointer to structure via the dereferenced input pointer
+    struct darray_header *dh = DARRAY_HEADER_VAR(*d);
 
     //check that we have the stucture and check length in bounds
-    assert(dh->data[0] == *d);
+    assert(dh->data[0] == **d);
     assert(dh->length >= 0 && dh->length <= dh->capacity);
 
     DARRAY_TRACE("appending element%c\n", ' ');
@@ -154,7 +154,8 @@ void darray_append(darray d, array_item element)
         size_t yes_pad = offsetof(struct darray_header, data) + array_size;
         size_t no_pad = sizeof(struct darray_header) + array_size;
 
-        DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n", (int)yes_pad, (int)no_pad);
+        DARRAY_TRACE("yes_pad: %d, no_pad: %d bytes\n",
+                     (int)yes_pad, (int)no_pad);
 
         struct darray_header *tmp;
         tmp = yes_pad < no_pad ? realloc(dh, yes_pad) : realloc(dh, no_pad);
@@ -163,6 +164,12 @@ void darray_append(darray d, array_item element)
     }
 
     dh->data[dh->length++] = element;
+
+    //by now, its possible that realloc moved dh to a new section of memory.
+    //if so, the original darray d input would be pointing somwhere invalid.
+    //so let's update it just in case.
+    //this is why we accepted a pointer to a darray (array_item **)
+    *d = dh->data;
 
     DARRAY_TRACE("length now at %d\n", dh->length);
     assert(dh->length >= 0 && dh->length <= dh->capacity);
