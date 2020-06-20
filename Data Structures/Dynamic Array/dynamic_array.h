@@ -29,37 +29,53 @@ typedef array_item *darray;
 /*******************************************************************************
 * public function: darray_create
 * purpose: constructor
-* returns: pointer to array_item
+* returns: darray
 *******************************************************************************/
 darray darray_create(void);
 
 /*******************************************************************************
 * public function: darray_destroy
 * purpose: destructor
-* @ d : pointer to first array_item in a dynamic array
+* @ d : darray
 *******************************************************************************/
 void darray_destroy(darray d);
 
 /*******************************************************************************
-* public function: vector_append
-* purpose: append element to end of array
-* @ d : pointer to pointer to array item
-* @ element : array item to append
-*******************************************************************************/
-void darray_append(darray *d, array_item element);
-
-/*******************************************************************************
-* public function: vector_len
+* public function: darray_len
 * purpose: get total number of elements currently in vector
-* @ d : pointer to array item
+* @ d : darray
 * returns: total number of elements currently in vector
 *******************************************************************************/
 int darray_len(darray d);
 
 /*******************************************************************************
-* public function: vector_show
+* public function: darray_append
+* purpose: push element onto end of array
+* @ d : pointer to darray
+* @ element : array item to append
+*******************************************************************************/
+void darray_push(darray *d, array_item element);
+
+/*******************************************************************************
+* public function: darray_pop
+* purpose: pop element off end of array
+* @ d : darray
+* returns: pointer to array item (darray but not necessarily the first element)
+*******************************************************************************/
+array_item *darray_pop(darray d);
+
+/*******************************************************************************
+* public function: darray_peek
+* purpose: examine but do not pop the elment at the end of the array
+* @ d : darray
+* returns: pointer to array item (darray but not necessarily the first element)
+*******************************************************************************/
+array_item *darray_peek(darray d);
+
+/*******************************************************************************
+* public function: darray_show
 * purpose: print vector contents to stdout
-* @ d : pointer to array item
+* @ d : darray
 *******************************************************************************/
 void darray_show(darray d);
 
