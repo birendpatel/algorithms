@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include "dynamic_array.h"
 
 /*******************************************************************************
@@ -47,13 +48,13 @@
 /*******************************************************************************
 * structure: darray_header
 * purpose: hidden 16 byte structure contains array metadata
-* @ stats cache : pointer to double for computed statistics cache
+* @ queue cache : pointer to the item removed during last popleft operation
 * @ capacity : current maximum size of array
 * @ length : current number of elements held in array
 * @ data : stores elements contained in array
 
      #---------------#------------#------------#-------------------#
-     #  stats cache  #  capacity  #   length   #  data ----------> #
+     #  queue cache  #  capacity  #   length   #  data ----------> #
      #---------------#------------#------------#-------------------#
 
      \_______________________________________/  \_________________/
@@ -63,7 +64,7 @@
 
 struct __attribute__ ((packed)) darray_header
 {
-    double *stats_cache;
+    array_item *queue_cache;
     uint32_t capacity;
     uint32_t length;
     array_item data[];
@@ -87,7 +88,7 @@ darray darray_create(void)
     VERIFY_POINTER(malloc, dh);
 
     //define header metadata
-    dh->stats_cache = NULL;
+    dh->queue_cache = NULL;
     dh->capacity = INIT_CAPACITY;
     dh->length = 0;
 
@@ -109,10 +110,11 @@ void darray_destroy(darray d)
     assert(dh->data[0] == *d);
 
     DARRAY_TRACE("destroying dynamic array "
-                 "with members\n\tcache: %p\n\tcapacity: %d\n\tlength: %d\n",
-                 (void*) dh->stats_cache, dh->capacity, dh->length);
+                 "with members\n\tq cache: %p\n\tcapacity: %d\n\tlength: %d\n",
+                 (void*) dh->queue_cache, dh->capacity, dh->length);
 
-    //pointers are checking out okay, lets free the memory block
+    //pointers are checking out okay, free queue cache and then memory block
+    free(dh->queue_cache);
     free(dh);
     return;
 }
@@ -209,6 +211,54 @@ array_item *darray_pop(darray d)
         DARRAY_TRACE("pop successful%c\n", ' ');
 
         return top;
+    }
+}
+
+/******************************************************************************/
+
+array_item *darray_popleft(darray d)
+{
+    assert(d != NULL);
+    DARRAY_TRACE("popleft requested%c\n", ' ');
+
+    struct darray_header *dh = DARRAY_HEADER_VAR(d);
+
+    assert(dh->data[0] == *d);
+    assert(dh->length >= 0 && dh->length <= dh->capacity);
+
+    if (dh->length == 0)
+    {
+        //reset queue cache to NULL if necessary and return NULL like pop/peek
+        DARRAY_TRACE("nothing to pop%c\n", ' ');
+        dh->queue_cache = NULL;
+        return NULL;
+    }
+    else
+    {
+        //empty queue cache, otherwise memory leak from previous calls
+        free(dh->queue_cache);
+
+        //reserve memory for queue cache
+        dh->queue_cache = malloc(sizeof(array_item));
+        VERIFY_POINTER(malloc, dh->queue_cache);
+
+        //store copy of first item in cache block
+        *dh->queue_cache = dh->data[0];
+        assert(*dh->queue_cache == dh->data[0]);
+
+        //move back all the elements in data array
+        if (--dh->length != 0)
+        {
+            size_t n_bytes = dh->length * sizeof(array_item);
+
+            array_item *start = memmove(dh->data, dh->data + 1, n_bytes);
+
+            VERIFY_POINTER(memmove, start);
+        }
+
+        //good to hand pointer to popleft item back to client
+        DARRAY_TRACE("popleft successful%c\n", ' ');
+        return dh->queue_cache;
     }
 }
 

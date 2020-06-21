@@ -17,7 +17,7 @@ typedef int array_item;
 #define INCREASE_CAPACITY(n) (2 * n)
 #define INIT_CAPACITY 1
 #define FMT_STRING "%d "
-#define DYNAMIC_ARRAY_DEBUG 0
+#define DYNAMIC_ARRAY_DEBUG 1
 
 /*******************************************************************************
 * typedef: darray
@@ -60,15 +60,23 @@ void darray_push(darray *d, array_item element);
 * public function: darray_pop
 * purpose: pop element off end of array
 * @ d : darray
-* returns: pointer to array item (darray but not necessarily the first element)
+* returns: pointer to array item, NULL if pop not possible
 *******************************************************************************/
 array_item *darray_pop(darray d);
+
+/*******************************************************************************
+* public function: darray_popleft
+* purpose: pop element off front of array, as if it is a queue
+* @ d : darray
+* returns: pointer to array_item, NULL if popleft not possible
+*******************************************************************************/
+array_item *darray_popleft(darray d);
 
 /*******************************************************************************
 * public function: darray_peek
 * purpose: examine but do not pop the elment at the end of the array
 * @ d : darray
-* returns: pointer to array item (darray but not necessarily the first element)
+* returns: pointer to array item, NULL if peek not possible
 *******************************************************************************/
 array_item *darray_peek(darray d);
 
