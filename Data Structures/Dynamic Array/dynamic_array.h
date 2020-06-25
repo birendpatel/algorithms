@@ -6,20 +6,19 @@
 #ifndef DYNAMIC_ARRAY_H
 #define DYNAMIC_ARRAY_H
 
+#include <stddef.h>
+
 /*******************************************************************************
 * user-modifiable parameters
 * @ array_item : data type of item stored in array
 * @ increase_capacity : new array capacity as function of previous capacity n
-* @ init_capacity : capacity of array on initalization
-* @ fmt_string : format string used to print array contents
+* @ fmt_string : format string to print array contents, must match array_item
 * @ dyanmic_array_debug : set to 1 for verbose debugging output to stdout
 *******************************************************************************/
 typedef int array_item;
-
 #define INCREASE_CAPACITY(n) (2 * n)
-#define INIT_CAPACITY 1
 #define FMT_STRING "%d "
-#define DYNAMIC_ARRAY_DEBUG 1
+#define DYNAMIC_ARRAY_DEBUG 0
 
 /*******************************************************************************
 * typedef: darray
@@ -30,9 +29,10 @@ typedef array_item *darray;
 /*******************************************************************************
 * public function: darray_create
 * purpose: constructor
+* @ init_capacity : initial capacity of array
 * returns: darray, pointer to first uninitialized element of an array
 *******************************************************************************/
-darray darray_create(void);
+darray darray_create(size_t init_capacity);
 
 /*******************************************************************************
 * public function: darray_destroy

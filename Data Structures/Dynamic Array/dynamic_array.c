@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
 #include "dynamic_array.h"
 
 /*******************************************************************************
@@ -77,16 +78,16 @@ struct __attribute__ ((packed)) darray_header
 * public functions
 *******************************************************************************/
 
-darray darray_create(void)
+darray darray_create(size_t init_capacity)
 {
     struct darray_header *dh;
     
     //check conditions
-    assert(INIT_CAPACITY > 0 && "init_capacity macro is not positive int");
+    assert(init_capacity > 0 && "init_capacity is not positive int");
     assert(sizeof(struct darray_header) == 16 && "header is not 16 bytes");
 
     //allocate memory for 16 byte header + flexible array member
-    dh = malloc(16 + sizeof(array_item) * INIT_CAPACITY);
+    dh = malloc(16 + sizeof(array_item) * init_capacity);
     verify_pointer(malloc, dh);
 
     //allocate memory for queue cache but nothing to store just yet
@@ -94,7 +95,7 @@ darray darray_create(void)
     verify_pointer(malloc, dh->queue_cache);
     
     //define remaining header metadata
-    dh->capacity = INIT_CAPACITY;
+    dh->capacity = init_capacity;
     dh->length = 0;
 
     //client receives the array but everything else remains hidden
