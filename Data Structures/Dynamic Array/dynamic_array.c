@@ -131,34 +131,45 @@ int darray_len(darray d)
 
 /******************************************************************************/
 
-void darray_push(darray *d, array_item element)
+bool darray_push(darray *d, array_item element)
 {
     //define pointer to array header
     struct darray_header *dh = DARRAY_HEADER_VAR(*d);
 
     assert(dh->data[0] == **d && "input pointer is not constructor pointer");
 
-    //no space left in the allocated block to push the element
+    //no space left in the allocated block to push an element.
     if (dh->length == dh->capacity)
     {
-        //determine new array capacity as a function of current capacity
-        dh->capacity = INCREASE_CAPACITY(dh->capacity);
+        if (dh->length == UINT32_MAX)
+        {
+            darray_trace("capacity cannot increase, push impossible%c\n", ' ');
+            return false;
+        }
+        else
+        {
+            //determine new array capacity as a function of current capacity
+            dh->capacity = INCREASE_CAPACITY(dh->capacity);
+            
+            //override growth with a ceiling if new capacity exceeds uint32
+            if (dh->capacity > UINT32_MAX) dh->capacity = UINT32_MAX;
 
-        assert(dh->capacity > dh->length && "capacity function not monotonic");
-        darray_trace("increased capacity to %d\n", dh->capacity);
+            assert(dh->capacity > dh->length && "capacity fx not monotonic");
+            darray_trace("increased capacity to %d\n", dh->capacity);
 
-        //determine total bytes needed
-        size_t new_size = 16 + sizeof(array_item) * dh->capacity;
-        darray_trace("new darray memory block of %d bytes\n", (int) new_size);
+            //determine total bytes needed
+            size_t new_size = 16 + sizeof(array_item) * dh->capacity;
+            darray_trace("new memory block of %d bytes\n", (int) new_size);
 
-        //reallocate memory and redirect dh pointer
-        struct darray_header *tmp = realloc(dh, new_size);
-        verify_pointer(realloc, tmp);
-        dh = tmp;
-        
-        //realloc may have moved dh to new section of memory.
-        //if so, update dereferenced input so client has the correct location
-        *d = dh->data;
+            //reallocate memory and redirect dh pointer
+            struct darray_header *tmp = realloc(dh, new_size);
+            verify_pointer(realloc, tmp);
+            dh = tmp;
+            
+            //realloc may have moved dh to new section of memory.
+            //if so, update dereferenced input so client has correct address
+            *d = dh->data;
+        }
     }
 
     //space available in allocated block, go ahead and push element
@@ -167,6 +178,8 @@ void darray_push(darray *d, array_item element)
     dh->data[dh->length++] = element;
     
     assert(dh->length <= dh->capacity && "length exceeds maximum capacity");
+    
+    return true;
 }
 
 /******************************************************************************/

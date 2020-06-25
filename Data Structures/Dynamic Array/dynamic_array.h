@@ -7,6 +7,7 @@
 #define DYNAMIC_ARRAY_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 /*******************************************************************************
 * user-modifiable parameters
@@ -54,8 +55,9 @@ int darray_len(darray d);
 * purpose: push element onto end of array
 * @ d : pointer to darray, the same darray returned by constructor
 * @ element : array item to append
+* returns: true if push is successful, false otherwise
 *******************************************************************************/
-void darray_push(darray *d, array_item element);
+bool darray_push(darray *d, array_item element);
 
 /*******************************************************************************
 * public function: darray_pop
