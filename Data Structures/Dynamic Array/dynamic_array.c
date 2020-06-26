@@ -115,16 +115,16 @@ int darray_push(darray *d, array_item element)
         else
         {
             //determine new array capacity as a function of current capacity
-            dh->capacity = INCREASE_CAPACITY(dh->capacity);
+            uint32_t new_capacity = INCREASE_CAPACITY(dh->capacity);
             
             //override growth with a ceiling if new capacity exceeds uint32
-            if (dh->capacity > UINT32_MAX) dh->capacity = UINT32_MAX;
+            if (new_capacity > UINT32_MAX) new_capacity = UINT32_MAX;
 
-            assert(dh->capacity > dh->length && "capacity fx not monotonic");
-            darray_trace("increased capacity to %d\n", dh->capacity);
+            assert(new_capacity > dh->length && "capacity fx not monotonic");
+            darray_trace("increased capacity to %d\n", new_capacity);
 
             //determine total bytes needed
-            size_t new_size = HSIZE + sizeof(array_item) * dh->capacity;
+            size_t new_size = HSIZE + sizeof(array_item) * new_capacity;
             darray_trace("new memory block of %d bytes\n", (int) new_size);
 
             //reallocate memory and redirect dh pointer
@@ -132,6 +132,9 @@ int darray_push(darray *d, array_item element)
             
             if (tmp == NULL) return 2;
             else dh = tmp;
+            
+            //realloc success so update dh->capacity
+            dh->capacity = new_capacity;
             
             //realloc may have moved dh to new section of memory.
             //if so, update dereferenced input so client has correct address
