@@ -241,21 +241,3 @@ bool darray_peek(darray d, array_item *peeked_item)
         return true;
     }
 }
-
-/******************************************************************************/
-
-void darray_show(darray d)
-{
-    //define pointer to array header
-    struct darray_header *dh = DARRAY_HEADER_VAR(d);
-
-    assert(dh->data[0] == *d && "input pointer is not constructor pointer");
-
-    //loop and print
-    for(size_t i = 0; i < dh->length; ++i)
-    {
-        printf(FMT_STRING, d[i]);
-    }
-
-    puts("");
-}

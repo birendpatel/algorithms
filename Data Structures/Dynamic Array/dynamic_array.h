@@ -1,8 +1,7 @@
 /*
 * Author: Biren Patel
 * Description: Public API for dynamic array abstract data type with stack and
-* queue functionality. Stack operations are fast, queue operations are not. See
-* the comments in the implementation file for more details on memory usage.
+* queue functionality. Stack operations are fast, queue operations are not. 
 */
 
 #ifndef DYNAMIC_ARRAY_H
@@ -14,12 +13,12 @@
 
 /*******************************************************************************
 * user-modifiable parameters
-* @ array_item : data type of item stored in array
+* @ array_item : data type of item stored in array, set void* for a generic ADT
 * @ increase_capacity : new array capacity as function of previous capacity n
-* @ fmt_string : format string to print array contents, must match array_item
+* @ fmt_string : printf format string to print array, must match array_item
 * @ dynamic_array_debug : set to 1 for verbose debugging output to stdout
 *******************************************************************************/
-typedef char* array_item;
+typedef void* array_item;
 #define INCREASE_CAPACITY(n) (2 * n)
 #define FMT_STRING "%s "
 #define DYNAMIC_ARRAY_DEBUG 0
@@ -133,8 +132,11 @@ int darray_push(darray *d, array_item element);
 * public function: darray_pop
 * purpose: pop element off end of array
 * @ d : darray, the same darray returned by constructor
-* @ popped_item : pointer to storage location for popped item
+* @ popped_item : pointer to storage location for popped item or NULL to discard
 * returns: true if pop is successful, false otherwise
+* note: if items on the array are dynamically allocated, you must be careful to
+*       not pass NULL as the argument to popped_item, as this may result in a
+*       memory leak.
 *******************************************************************************/
 bool darray_pop(darray d, array_item *popped_item);
 
@@ -142,8 +144,11 @@ bool darray_pop(darray d, array_item *popped_item);
 * public function: darray_popleft
 * purpose: pop element off front of array
 * @ d : darray, the same darray returned by constructor
-* @ popped_item : pointer to storage location for popped item
+* @ popped_item : pointer to storage location for popped item or NULL to discard
 * returns: true if pop is successful, false otherwise
+* note: if items on the array are dynamically allocated, you must be careful to
+*       not pass NULL as the argument to popped_item, as this may result in a
+*       memory leak.
 *******************************************************************************/
 bool darray_popleft(darray d, array_item *popped_item);
 
@@ -151,16 +156,9 @@ bool darray_popleft(darray d, array_item *popped_item);
 * public function: darray_peek
 * purpose: examine but do not pop the element at the end of the array
 * @ d : darray, the same darray returned by constructor
-* @ peeked_item : pointer to storage location for peeked-at item
+* @ peeked_item : pointer to storage location for peeked item
 * returns: true if peek is successful, false otherwise
 *******************************************************************************/
 bool darray_peek(darray d, array_item *peeked_item);
-
-/*******************************************************************************
-* public function: darray_show
-* purpose: print array contents to stdout
-* @ d : darray, the same darray returned by constructor
-*******************************************************************************/
-void darray_show(darray d);
 
 #endif
