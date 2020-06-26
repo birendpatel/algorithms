@@ -1,6 +1,8 @@
 /*
 * Author: Biren Patel
-* Description: Public API for dynamic array abstract data type
+* Description: Public API for dynamic array abstract data type with stack and
+* queue functionality. Stack operations are fast, queue operations are not. See
+* the comments in the implementation file for more details on memory usage.
 */
 
 #ifndef DYNAMIC_ARRAY_H
@@ -14,7 +16,7 @@
 * @ array_item : data type of item stored in array
 * @ increase_capacity : new array capacity as function of previous capacity n
 * @ fmt_string : format string to print array contents, must match array_item
-* @ dyanmic_array_debug : set to 1 for verbose debugging output to stdout
+* @ dynamic_array_debug : set to 1 for verbose debugging output to stdout
 *******************************************************************************/
 typedef int array_item;
 #define INCREASE_CAPACITY(n) (2 * n)
@@ -31,9 +33,11 @@ typedef array_item *darray;
 * public function: darray_create
 * purpose: constructor
 * @ init_capacity : initial capacity of array
-* returns: darray, pointer to first uninitialized element of an array
+* @ destroy : pointer to function, used during destructor call to free memory
+* returns: darray, pointer to first uninitialized element of an array. NULL if
+*          malloc failed.
 *******************************************************************************/
-darray darray_create(size_t init_capacity);
+darray darray_create(size_t init_capacity, void (*destroy)(void *data));
 
 /*******************************************************************************
 * public function: darray_destroy
@@ -55,33 +59,38 @@ int darray_len(darray d);
 * purpose: push element onto end of array
 * @ d : pointer to darray, the same darray returned by constructor
 * @ element : array item to append
-* returns: true if push is successful, false otherwise
+* returns: error codes. 0 if successful push. 1 if failure because the array
+           currently contains 4,294,967,295 elements. This cannot be exceeded.
+           2 if memory reallocation fails during realloc call. 
 *******************************************************************************/
-bool darray_push(darray *d, array_item element);
+int darray_push(darray *d, array_item element);
 
 /*******************************************************************************
 * public function: darray_pop
 * purpose: pop element off end of array
 * @ d : darray, the same darray returned by constructor
-* returns: pointer to array item, NULL if pop not possible
+* @ popped_item : pointer to storage location for popped item
+* returns: true if pop is successful, false otherwise
 *******************************************************************************/
-array_item *darray_pop(darray d);
+bool darray_pop(darray d, array_item *popped_item);
 
 /*******************************************************************************
 * public function: darray_popleft
 * purpose: pop element off front of array
 * @ d : darray, the same darray returned by constructor
-* returns: pointer to array_item, NULL if popleft not possible
+* @ popped_item : pointer to storage location for popped item
+* returns: true if pop is successful, false otherwise
 *******************************************************************************/
-array_item *darray_popleft(darray d);
+bool darray_popleft(darray d, array_item *popped_item);
 
 /*******************************************************************************
 * public function: darray_peek
 * purpose: examine but do not pop the element at the end of the array
 * @ d : darray, the same darray returned by constructor
-* returns: pointer to array item, NULL if peek not possible
+* @ peeked_item : pointer to storage location for peeked-at item
+* returns: true if peek is successful, false otherwise
 *******************************************************************************/
-array_item *darray_peek(darray d);
+bool darray_peek(darray d, array_item *peeked_item);
 
 /*******************************************************************************
 * public function: darray_show

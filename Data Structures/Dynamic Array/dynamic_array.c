@@ -1,7 +1,6 @@
 /*
 * Author: Biren Patel
 * Description: Implementation for dynamic array abstract data type
-* Note: uses non-portable GCC features, assumes x64, best with std data types.
 */
 
 #include <stdio.h>
@@ -10,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "dynamic_array.h"
 
@@ -28,47 +28,55 @@
         }                                                                      \
         while(0)
 
+
 /*******************************************************************************
-* macro: verify_pointer
-* purpose: exit with failure if a pointer is null
-* @ test : name of the test being performed
-* @ pointer : the pointer you wish to test
+* macro: hsize
+* purpose: size of struct darray_header, typically 16 bytes
 *******************************************************************************/
 
-#define verify_pointer(test, pointer)                                          \
-        if (pointer == NULL)                                                   \
-        {                                                                      \
-            fprintf(stderr, #test " fail: %s in %s\n", __func__, __FILE__);    \
-            exit(EXIT_FAILURE);                                                \
-        }
+#define HSIZE sizeof(struct darray_header)
 
 /*******************************************************************************
 * macro: darray_header_var
 * purpose: get a pointer to darray_header given a pointer to the data member
+* note: offset is typically 16 bytes
 *******************************************************************************/
 
-#define DARRAY_HEADER_VAR(d) ((struct darray_header *) (((char*) (d)) - 16))
+#define DARRAY_HEADER_VAR(d)                                                   \
+        ((struct darray_header *)                                              \
+        (((char*) (d)) - offsetof(struct darray_header, data)))
 
 /*******************************************************************************
 * structure: darray_header
 * purpose: dynamic array metadata
-* @ queue cache : pointer to item removed in previous popleft operation
+* @ destroy : pointer to function, used during destructor call to free memory
 * @ capacity : maximum size of array
 * @ length : number of elements held in array
 * @ data : contents of the array
-
-     #---------------#------------#------------#-------------------#
-     #  queue cache  #  capacity  #   length   #  data ----------> #
-     #---------------#------------#------------#-------------------#
-
-     \_______________________________________/  \_________________/
-             hidden metadata (16 bytes)            exposed array
-
+*
+* note: for most standard array_items, those that appear in powers of 2 up to 
+*       16 bytes, this structure should remain space efficent as the header
+*       will pack to exactly 16 bytes and the malloc for the FLA will not
+*       overcommit memory. But, for data types violating the structure packing,
+*       while there are no problems with this, you may have some extra padding
+*       bytes and malloc may overcommit if the FLA decides to push back onto 
+*       any trailing padding. 
+*
+* diagram:
+*
+*         #-----------#------------#------------#-------------------#
+*         #  destroy  #  capacity  #   length   #  data ----------> #
+*         #-----------#------------#------------#-------------------#
+*
+*         \____________________________________/ \__________________/
+*                     hidden metadata                exposed array
+*               
+*
 *******************************************************************************/
 
-struct __attribute__ ((packed)) darray_header
+struct darray_header
 {
-    array_item *queue_cache;
+    void (*destroy)(void *data);
     uint32_t capacity;
     uint32_t length;
     array_item data[];
@@ -78,23 +86,19 @@ struct __attribute__ ((packed)) darray_header
 * public functions
 *******************************************************************************/
 
-darray darray_create(size_t init_capacity)
+darray darray_create(size_t init_capacity, void (*destroy)(void *data))
 {
     struct darray_header *dh;
     
     //check conditions
     assert(init_capacity > 0 && "init_capacity is not positive int");
-    assert(sizeof(struct darray_header) == 16 && "header is not 16 bytes");
 
-    //allocate memory for 16 byte header + flexible array member
-    dh = malloc(16 + sizeof(array_item) * init_capacity);
-    verify_pointer(malloc, dh);
-
-    //allocate memory for queue cache but nothing to store just yet
-    dh->queue_cache = malloc(sizeof(array_item));
-    verify_pointer(malloc, dh->queue_cache);
+    //allocate memory for header + flexible array member
+    dh = malloc(HSIZE + sizeof(array_item) * init_capacity);
+    if (dh == NULL) return NULL;
     
     //define remaining header metadata
+    dh->destroy = destroy;
     dh->capacity = init_capacity;
     dh->length = 0;
 
@@ -111,9 +115,7 @@ void darray_destroy(darray d)
 
     assert(dh->data[0] == *d && "input pointer is not constructor pointer");
 
-    //free the queue cache before the header
-    free(dh->queue_cache);
-    free(dh);
+    (*dh->destroy)(dh);
 }
 
 /******************************************************************************/
@@ -131,7 +133,7 @@ int darray_len(darray d)
 
 /******************************************************************************/
 
-bool darray_push(darray *d, array_item element)
+int darray_push(darray *d, array_item element)
 {
     //define pointer to array header
     struct darray_header *dh = DARRAY_HEADER_VAR(*d);
@@ -144,7 +146,7 @@ bool darray_push(darray *d, array_item element)
         if (dh->length == UINT32_MAX)
         {
             darray_trace("capacity cannot increase, push impossible%c\n", ' ');
-            return false;
+            return 1;
         }
         else
         {
@@ -158,13 +160,14 @@ bool darray_push(darray *d, array_item element)
             darray_trace("increased capacity to %d\n", dh->capacity);
 
             //determine total bytes needed
-            size_t new_size = 16 + sizeof(array_item) * dh->capacity;
+            size_t new_size = HSIZE + sizeof(array_item) * dh->capacity;
             darray_trace("new memory block of %d bytes\n", (int) new_size);
 
             //reallocate memory and redirect dh pointer
             struct darray_header *tmp = realloc(dh, new_size);
-            verify_pointer(realloc, tmp);
-            dh = tmp;
+            
+            if (tmp == NULL) return 2;
+            else dh = tmp;
             
             //realloc may have moved dh to new section of memory.
             //if so, update dereferenced input so client has correct address
@@ -179,12 +182,12 @@ bool darray_push(darray *d, array_item element)
     
     assert(dh->length <= dh->capacity && "length exceeds maximum capacity");
     
-    return true;
+    return 0;
 }
 
 /******************************************************************************/
 
-array_item *darray_pop(darray d)
+bool darray_pop(darray d, array_item *popped_item)
 {
     darray_trace("pop requested%c\n", ' ');
 
@@ -197,23 +200,25 @@ array_item *darray_pop(darray d)
     {
         darray_trace("nothing to pop%c\n", ' ');
         
-        return NULL;
+        return false;
     }
     else
-    {
-        array_item *top = dh->data + (--dh->length);
+    {        
+        //decrement length for synthetic pop but only return item if requested
+        --dh->length;
+        
+        if (popped_item != NULL) *popped_item = dh->data[dh->length];
         
         assert(dh->length >= 0 && "array length is negative");
-        assert(top != NULL && "popped item is null");
         darray_trace("pop successful%c\n", ' ');
-
-        return top;
+        
+        return true;
     }
 }
 
 /******************************************************************************/
 
-array_item *darray_popleft(darray d)
+bool darray_popleft(darray d, array_item *popped_item)
 {
     darray_trace("popleft requested%c\n", ' ');
 
@@ -224,39 +229,30 @@ array_item *darray_popleft(darray d)
 
     if (dh->length == 0)
     {
-        //reset queue cache to NULL
-        darray_trace("nothing to pop%c\n", ' ');
+        darray_trace("nothing to popleft%c\n", ' ');
         
-        dh->queue_cache = NULL;
-        
-        return NULL;
+        return false;
     }
     else
     {
-        //copy first item in array to cache block
-        *dh->queue_cache = dh->data[0];
-        
-        assert(*dh->queue_cache == dh->data[0] && "queue copy to cache failed");
+        //copy first item to client storage if requested
+        if (popped_item != NULL) *popped_item = dh->data[0];
 
         //move all the elements in the data array back by one index
         if (--dh->length != 0)
         {
-            size_t n_bytes = dh->length * sizeof(array_item);
-
-            array_item *start = memmove(dh->data, dh->data + 1, n_bytes);
-
-            verify_pointer(memmove, start);
+            memmove(dh->data, dh->data + 1, dh->length * sizeof(array_item));
         }
 
-        //cache has popped item and memory moved back, good to proceed
         darray_trace("popleft successful%c\n", ' ');
-        return dh->queue_cache;
+        
+        return true;
     }
 }
 
 /******************************************************************************/
 
-array_item *darray_peek(darray d)
+bool darray_peek(darray d, array_item *peeked_item)
 {
     darray_trace("peek requested%c\n", ' ');
 
@@ -265,21 +261,20 @@ array_item *darray_peek(darray d)
 
     assert(dh->data[0] == *d && "input pointer is not constructor pointer");
 
-    if (dh->length == 0)
+    if (dh->length == 0 || peeked_item == NULL)
     {
-        darray_trace("nothing to peek at%c\n", ' ');
+        darray_trace("nothing to peek at or peek used improperly%c\n", ' ');
 
-        return NULL;
+        return false;
     }
     else
-    {
-        array_item *top = dh->data + (dh->length - 1);
+    {   
+        *peeked_item = dh->data[dh->length - 1];
         
         assert(dh->length >= 0 && "array length is negative");
-        assert(top != NULL && "top item is null");
         darray_trace("peek successful%c\n", ' ');
-
-        return top;
+        
+        return true;
     }
 }
 
