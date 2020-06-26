@@ -47,46 +47,10 @@
         (((char*) (d)) - offsetof(struct darray_header, data)))
 
 /*******************************************************************************
-* structure: darray_header
-* purpose: dynamic array metadata
-* @ destroy : pointer to function, used during destructor call to free memory
-* @ capacity : maximum size of array
-* @ length : number of elements held in array
-* @ data : contents of the array
-*
-* note: for most standard array_items, those that appear in powers of 2 up to 
-*       16 bytes, this structure should remain space efficent as the header
-*       will pack to exactly 16 bytes and the malloc for the FLA will not
-*       overcommit memory. But, for data types violating the structure packing,
-*       while there are no problems with this, you may have some extra padding
-*       bytes and malloc may overcommit if the FLA decides to push back onto 
-*       any trailing padding. 
-*
-* diagram:
-*
-*         #-----------#------------#------------#-------------------#
-*         #  destroy  #  capacity  #   length   #  data ----------> #
-*         #-----------#------------#------------#-------------------#
-*
-*         \____________________________________/ \__________________/
-*                     hidden metadata                exposed array
-*               
-*
-*******************************************************************************/
-
-struct darray_header
-{
-    void (*destroy)(void *data);
-    uint32_t capacity;
-    uint32_t length;
-    array_item data[];
-};
-
-/*******************************************************************************
 * public functions
 *******************************************************************************/
 
-darray darray_create(size_t init_capacity, void (*destroy)(void *data))
+darray darray_create(size_t init_capacity, void (*destroy)(void *ptr))
 {
     struct darray_header *dh;
     
