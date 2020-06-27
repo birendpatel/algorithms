@@ -1,7 +1,7 @@
 /*
 * Author: Biren Patel
 * Description: Public API for dynamic array abstract data type with stack and
-* queue functionality. Stack operations are fast, queue operations are not. 
+* queue functionality. Stack operations are fast, queue operations are not.
 */
 
 #ifndef DYNAMIC_ARRAY_H
@@ -37,7 +37,7 @@ typedef array_item *darray;
 * purpose: dynamic array metadata
 * @ destroy : pointer to function, used during destructor call to free memory
 * @ capacity : maximum size of array
-* @ length : number of elements held in array
+* @ count : number of elements held in array
 * @ data : contents of the array
 *
 * note: For most standard array_items, those that appear in powers of 2 up to 
@@ -49,9 +49,9 @@ typedef array_item *darray;
 *
 * diagram:
 *
-*         #-----------#------------#------------#-------------------#
-*         #  destroy  #  capacity  #   length   #  data ----------> #
-*         #-----------#------------#------------#-------------------#
+*         #-----------#------------#-------------#-------------------#
+*         #  destroy  #  capacity  #    count    #  data ----------> #
+*         #-----------#------------#-------------#-------------------#
 *
 *         \____________________________________/ \__________________/
 *                     hidden metadata                exposed array
@@ -73,7 +73,7 @@ typedef array_item *darray;
 *       {
 *           struct darray_header *dh = (struct darray_header *) header;
 *           
-*           for(size_t i = 0; i < dh->length; ++i)
+*           for(size_t i = 0; i < dh->count; ++i)
 *           {
 *               free(dh->data[i]);
 *           }
@@ -87,7 +87,7 @@ struct darray_header
 {
     void (*destroy)(void *ptr);
     uint32_t capacity;
-    uint32_t length;
+    uint32_t count;
     array_item data[];
 };
 
@@ -110,12 +110,12 @@ darray darray_create(size_t init_capacity, void (*destroy)(void *ptr));
 void darray_destroy(darray d);
 
 /*******************************************************************************
-* public function: darray_len
-* purpose: get length of array
+* public function: darray_count
+* purpose: count total number of elements currently in array
 * @ d : darray, the same darray returned by constructor
 * returns: total number of elements currently in array
 *******************************************************************************/
-int darray_len(darray d);
+int darray_count(darray d);
 
 /*******************************************************************************
 * public function: darray_append
@@ -126,7 +126,7 @@ int darray_len(darray d);
            currently contains 4,294,967,295 elements. This cannot be exceeded.
            2 if memory reallocation fails during realloc call. 
 *******************************************************************************/
-int darray_push(darray *d, array_item element);
+int darray_append(darray *d, array_item element);
 
 /*******************************************************************************
 * public function: darray_pop

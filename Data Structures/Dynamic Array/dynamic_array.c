@@ -64,7 +64,7 @@ darray darray_create(size_t init_capacity, void (*destroy)(void *ptr))
     //define remaining header metadata
     dh->destroy = destroy;
     dh->capacity = init_capacity;
-    dh->length = 0;
+    dh->count = 0;
 
     //client receives the array but everything else remains hidden
     return dh->data;
@@ -84,20 +84,20 @@ void darray_destroy(darray d)
 
 /******************************************************************************/
 
-int darray_len(darray d)
+int darray_count(darray d)
 {
     //define pointer to array header
     struct darray_header *dh = DARRAY_HEADER_VAR(d);
 
     assert(dh->data[0] == *d && "input pointer is not constructor pointer");
 
-    return dh->length;
+    return dh->count;
 }
 
 
 /******************************************************************************/
 
-int darray_push(darray *d, array_item element)
+int darray_append(darray *d, array_item element)
 {
     //define pointer to array header
     struct darray_header *dh = DARRAY_HEADER_VAR(*d);
@@ -105,9 +105,9 @@ int darray_push(darray *d, array_item element)
     assert(dh->data[0] == **d && "input pointer is not constructor pointer");
 
     //no space left in the allocated block to push an element.
-    if (dh->length == dh->capacity)
+    if (dh->count == dh->capacity)
     {
-        if (dh->length == UINT32_MAX)
+        if (dh->count == UINT32_MAX)
         {
             darray_trace("capacity cannot increase, push impossible%c\n", ' ');
             return 1;
@@ -120,7 +120,7 @@ int darray_push(darray *d, array_item element)
             //override growth with a ceiling if new capacity exceeds uint32
             if (new_capacity > UINT32_MAX) new_capacity = UINT32_MAX;
 
-            assert(new_capacity > dh->length && "capacity fx not monotonic");
+            assert(new_capacity > dh->count && "capacity fx not monotonic");
             darray_trace("increased capacity to %d\n", new_capacity);
 
             //determine total bytes needed
@@ -145,9 +145,9 @@ int darray_push(darray *d, array_item element)
     //space available in allocated block, go ahead and push element
     darray_trace("pushing element to dynamic array%c\n", ' ');
     
-    dh->data[dh->length++] = element;
+    dh->data[dh->count++] = element;
     
-    assert(dh->length <= dh->capacity && "length exceeds maximum capacity");
+    assert(dh->count <= dh->capacity && "count exceeds maximum capacity");
     
     return 0;
 }
@@ -163,7 +163,7 @@ bool darray_pop(darray d, array_item *popped_item)
 
     assert(dh->data[0] == *d && "input pointer is not constructor pointer");
 
-    if (dh->length == 0)
+    if (dh->count == 0)
     {
         darray_trace("nothing to pop%c\n", ' ');
         
@@ -171,12 +171,12 @@ bool darray_pop(darray d, array_item *popped_item)
     }
     else
     {        
-        //decrement length for synthetic pop but only return item if requested
-        --dh->length;
+        //decrement count for synthetic pop but only return item if requested
+        --dh->count;
         
-        if (popped_item != NULL) *popped_item = dh->data[dh->length];
+        if (popped_item != NULL) *popped_item = dh->data[dh->count];
         
-        assert(dh->length >= 0 && "array length is negative");
+        assert(dh->count >= 0 && "array count is negative");
         darray_trace("pop successful%c\n", ' ');
         
         return true;
@@ -194,7 +194,7 @@ bool darray_popleft(darray d, array_item *popped_item)
 
     assert(dh->data[0] == *d && "input pointer is not constructor pointer");
 
-    if (dh->length == 0)
+    if (dh->count == 0)
     {
         darray_trace("nothing to popleft%c\n", ' ');
         
@@ -206,9 +206,9 @@ bool darray_popleft(darray d, array_item *popped_item)
         if (popped_item != NULL) *popped_item = dh->data[0];
 
         //move all the elements in the data array back by one index
-        if (--dh->length != 0)
+        if (--dh->count != 0)
         {
-            memmove(dh->data, dh->data + 1, dh->length * sizeof(array_item));
+            memmove(dh->data, dh->data + 1, dh->count * sizeof(array_item));
         }
 
         darray_trace("popleft successful%c\n", ' ');
@@ -228,7 +228,7 @@ bool darray_peek(darray d, array_item *peeked_item)
 
     assert(dh->data[0] == *d && "input pointer is not constructor pointer");
 
-    if (dh->length == 0 || peeked_item == NULL)
+    if (dh->count == 0 || peeked_item == NULL)
     {
         darray_trace("nothing to peek at or peek used improperly%c\n", ' ');
 
@@ -236,9 +236,9 @@ bool darray_peek(darray d, array_item *peeked_item)
     }
     else
     {   
-        *peeked_item = dh->data[dh->length - 1];
+        *peeked_item = dh->data[dh->count - 1];
         
-        assert(dh->length >= 0 && "array length is negative");
+        assert(dh->count >= 0 && "array count is negative");
         darray_trace("peek successful%c\n", ' ');
         
         return true;
