@@ -15,13 +15,9 @@
 * user-modifiable parameters
 * @ array_item : data type of item stored in array, set void* for a generic ADT
 * @ increase_capacity : new array capacity as function of previous capacity n
-* @ fmt_string : printf format string to print array, must match array_item
-* @ dynamic_array_debug : set to 1 for verbose debugging output to stdout
 *******************************************************************************/
 typedef void* array_item;
 #define INCREASE_CAPACITY(n) (2 * n)
-#define FMT_STRING "%s "
-#define DYNAMIC_ARRAY_DEBUG 0
 
 /*******************************************************************************
 * typedef: darray
