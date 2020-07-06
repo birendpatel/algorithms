@@ -51,6 +51,7 @@ void custom_free(void *header)
         free(dh->data[i]);
     }
     
+    free(dh->queue);
     free(dh);
 }
 
@@ -102,7 +103,7 @@ void pop_several_elements_off_array_is_successful (void)
     
     for (size_t i = 0; i < 3; ++i)
     {
-        darray_pop(SUT, (void**) &item);
+        item = darray_pop(SUT);
         actual[i] = *item;
         free(item);
     }
@@ -138,7 +139,7 @@ void popleft_several_elements_off_array_is_successful (void)
     
     for (size_t i = 0; i < 3; ++i)
     {
-        darray_popleft(SUT, (void**) &item);
+        item = darray_popleft(SUT);
         actual[i] = *item;
         free(item);
     }
@@ -162,13 +163,11 @@ void calling_peek_does_not_accidentally_pop_element_off_array (void)
     darray_append(&SUT, pushed_item);
     
     //when we take a peek at the top pointer
-    char *peeked_item;
-    bool status = darray_peek(SUT, (void**) &peeked_item);
+    char *peeked_item = darray_peek(SUT);
     
     //then the peek will not accidentally pop the pointer off of the array
     TEST_ASSERT_EQUAL_STRING((char*) SUT[0], pushed_item);
     TEST_ASSERT_EQUAL_STRING(pushed_item, peeked_item);
-    TEST_ASSERT_TRUE(status);
     
     //afterwards clean up memory
     darray_destroy(SUT); 
@@ -188,10 +187,10 @@ void alternating_series_of_pop_and_popleft_is_possible (void)
     darray_append(&SUT, "test");
     
     //when an alternating series of pop and popleft operations occur
-    darray_pop(SUT, NULL);
-    darray_popleft(SUT, NULL);
-    darray_pop(SUT, NULL);
-    darray_popleft(SUT, NULL);
+    darray_pop(SUT);
+    darray_popleft(SUT);
+    darray_pop(SUT);
+    darray_popleft(SUT);
     
     //then we expect the array to result in an appropriate state
     TEST_ASSERT_EQUAL_STRING("just", (char*) SUT[0]);
@@ -200,65 +199,6 @@ void alternating_series_of_pop_and_popleft_is_possible (void)
     //afterwards clean up memory
     darray_destroy(SUT);
 }
-
-/******************************************************************************/
-
-void attempt_to_pop_from_empty_array_does_nothing (void)
-{
-    //given an array with no data
-    darray SUT = darray_create(1, free);
-    
-    //when a pop operation is requested
-    void *result = NULL;
-    bool status = darray_pop(SUT, &result);
-    
-    //then nothing happens
-    TEST_ASSERT_FALSE(status);
-    TEST_ASSERT_NULL(result);
-    
-    //afterwards clean up memory
-    darray_destroy(SUT);
-}
-
-
-/******************************************************************************/
-
-void attempt_to_popleft_from_empty_array_does_nothing (void)
-{
-    //given an array with no data
-    darray SUT = darray_create(1, free);
-    
-    //when a pop operation is requested
-    void *result = NULL;
-    bool status = darray_popleft(SUT, &result);
-    
-    //then nothing happens
-    TEST_ASSERT_FALSE(status);
-    TEST_ASSERT_NULL(result);
-    
-    //afterwards clean up memory
-    darray_destroy(SUT);
-}
-
-/******************************************************************************/
-
-void attempt_to_peek_from_empty_array_does_nothing (void)
-{
-    //given an array with no data
-    darray SUT = darray_create(1, free);
-    
-    //when a pop operation is requested
-    void *result = NULL;
-    bool status = darray_peek(SUT, &result);
-    
-    //then nothing happens
-    TEST_ASSERT_FALSE(status);
-    TEST_ASSERT_NULL(result);
-    
-    //afterwards clean up memory
-    darray_destroy(SUT);
-}
-
 
 /******************************************************************************/
 //this section is tested with DynamoRio, not Unity
@@ -279,7 +219,7 @@ int integration_test_does_not_result_in_a_memory_leak (void)
     int status;
     
     //perform a large amount of appends
-    for (size_t i = 0; i < 10000; ++i)
+    for (size_t i = 0; i < 20000; ++i)
     {
         obj = malloc(sizeof(struct object));
         verify_malloc(obj);
@@ -293,18 +233,13 @@ int integration_test_does_not_result_in_a_memory_leak (void)
     }
     
     //perform a large mixture of pop, popleft, and peek
-    for (size_t i = 0; i < 2500; ++i)
-    {
-        status = darray_pop(SUT, (void**) &obj);
-        assert(status == 1);
-        free(obj);
+    for (size_t i = 0; i < 5000; ++i)
+    {        
+        free(darray_pop(SUT));
         
-        status = darray_popleft(SUT, (void**) &obj);
-        assert(status == 1);
-        free(obj);
+        free(darray_popleft(SUT));
         
-        status = darray_peek(SUT, (void**) &obj);
-        assert(status == 1);
+        darray_peek(SUT);
     }
     
     //afterwards clean up memory
@@ -323,9 +258,6 @@ int main(void)
         RUN_TEST(popleft_several_elements_off_array_is_successful);
         RUN_TEST(calling_peek_does_not_accidentally_pop_element_off_array);
         RUN_TEST(alternating_series_of_pop_and_popleft_is_possible);
-        RUN_TEST(attempt_to_pop_from_empty_array_does_nothing);
-        RUN_TEST(attempt_to_popleft_from_empty_array_does_nothing);
-        RUN_TEST(attempt_to_peek_from_empty_array_does_nothing);
     UNITY_END();
     
     

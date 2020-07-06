@@ -40,15 +40,27 @@ darray darray_create(size_t init_capacity, void (*destroy)(void *ptr))
     
     //check conditions
     assert(init_capacity > 0 && "init_capacity is not positive int");
+    assert(destroy != NULL && "destroy function is null");
 
     //allocate memory for header + flexible array member
     dh = malloc(HSIZE + sizeof(array_item) * init_capacity);
     if (dh == NULL) return NULL;
     
+    //allocate memory for the queue pocket at the front of metadata   
+    dh->queue = malloc(sizeof(array_item));
+    if (dh->queue == NULL) return NULL;
+    
     //define remaining header metadata
+    dh->cache = NULL;
     dh->destroy = destroy;
     dh->capacity = init_capacity;
     dh->count = 0;
+    
+    //check that header is accessible by offset from the FLA
+    assert(DARRAY_HEADER_VAR(dh->data)->cache == NULL && "offset fail on cache");
+    assert(DARRAY_HEADER_VAR(dh->data)->destroy == destroy && "offset fail on destroy");
+    assert(DARRAY_HEADER_VAR(dh->data)->capacity == init_capacity && "offset fail on capacity");
+    assert(DARRAY_HEADER_VAR(dh->data)->count == 0 && "offset fail on count");
 
     //client receives the array but everything else remains hidden
     return dh->data;
@@ -58,15 +70,27 @@ darray darray_create(size_t init_capacity, void (*destroy)(void *ptr))
 
 void darray_destroy(darray d)
 {
+    assert(d != NULL && "input darray is null pointer");
+    
     struct darray_header *dh = DARRAY_HEADER_VAR(d);
-
-    (*dh->destroy)(dh);
+    
+    if (dh->destroy == free)
+    {
+        free(dh->queue);
+        free(dh);
+    }
+    else
+    {
+        (*dh->destroy)(dh);
+    }
 }
 
 /******************************************************************************/
 
 int darray_count(darray d)
-{
+{ 
+    assert(d != NULL && "input darray is null pointer");
+    
     struct darray_header *dh = DARRAY_HEADER_VAR(d);
 
     return dh->count;
@@ -77,6 +101,8 @@ int darray_count(darray d)
 
 int darray_append(darray *d, array_item element)
 {
+    assert(d != NULL && "input darray is null pointer");
+    
     struct darray_header *dh = DARRAY_HEADER_VAR(*d);
     
     //no space left in the allocated block to push an element.
@@ -124,68 +150,59 @@ int darray_append(darray *d, array_item element)
 
 /******************************************************************************/
 
-bool darray_pop(darray d, array_item *popped_item)
+array_item darray_pop(darray d)
 {
+    assert(d != NULL && "input darray is null pointer");
+    
     struct darray_header *dh = DARRAY_HEADER_VAR(d);
-
-    if (dh->count == 0)
-    {
-        return false;
-    }
-    else
-    {        
-        //decrement count for synthetic pop but only return item if requested
-        --dh->count;
-        
-        if (popped_item != NULL) *popped_item = dh->data[dh->count];
-        
-        assert(dh->count >= 0 && "array count is negative");
-        
-        return true;
-    }
+    
+    assert(dh->count != 0 && "nothing to pop");
+    
+    array_item popped_item = dh->data[--dh->count];
+    
+    assert(dh->count <= dh->capacity && "array count underflow");
+    
+    return popped_item;
 }
 
 /******************************************************************************/
 
-bool darray_popleft(darray d, array_item *popped_item)
+array_item darray_popleft(darray d)
 {
+    assert(d != NULL && "input darray is null pointer");
+    
     struct darray_header *dh = DARRAY_HEADER_VAR(d);
+    
+    assert(dh->count != 0 && "nothing to pop");
 
-    if (dh->count == 0)
+    //copy first item to queue cache storage
+    *dh->queue = dh->data[0];
+
+    //move all the elements in the data array back by one index
+    --dh->count;
+    assert(dh->count <= dh->capacity && "array count underflow");
+    
+    if (dh->count != 0)
     {
-        return false;
+        memmove(dh->data, dh->data + 1, dh->count * sizeof(array_item));
     }
-    else
-    {
-        //copy first item to client storage if requested
-        if (popped_item != NULL) *popped_item = dh->data[0];
-
-        //move all the elements in the data array back by one index
-        if (--dh->count != 0)
-        {
-            memmove(dh->data, dh->data + 1, dh->count * sizeof(array_item));
-        }
-
-        return true;
-    }
+    
+    return *dh->queue;
 }
 
 /******************************************************************************/
 
-bool darray_peek(darray d, array_item *peeked_item)
+array_item darray_peek(darray d)
 {
+    assert(d != NULL && "input darray is null pointer");
+    
     struct darray_header *dh = DARRAY_HEADER_VAR(d);
-
-    if (dh->count == 0 || peeked_item == NULL)
-    {
-        return false;
-    }
-    else
-    {   
-        *peeked_item = dh->data[dh->count - 1];
-        
-        assert(dh->count >= 0 && "array count is negative");
-        
-        return true;
-    }
+    
+    assert(dh->count != 0 && "nothing to pop");
+    
+    array_item peeked_item = dh->data[dh->count - 1];
+    
+    assert(dh->count <= dh->capacity && "array count underflow");
+    
+    return peeked_item;
 }

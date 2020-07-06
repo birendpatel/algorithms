@@ -31,26 +31,28 @@ typedef array_item *darray;
 /*******************************************************************************
 * structure: darray_header
 * purpose: dynamic array metadata
+* @ cache : an empty void pointer pocket for any strange end-user needs
+* @ queue : pointer to popleft array items to allow implementation details
 * @ destroy : pointer to function, used during destructor call to free memory
 * @ capacity : maximum size of array
 * @ count : number of elements held in array
 * @ data : contents of the array
 *
-* note: For most standard array_items, those that appear in powers of 2 up to 
-*       16 bytes, this structure should remain fairly efficent as the header
-*       will pack to exactly 16 bytes and the malloc for the FLA will not
+* note: For most standard array_items, those that appear in powers of 2, this 
+*       structure should remain fairly space-efficent because the header
+*       will pack to exactly 32 bytes and the malloc for the FLA will not
 *       overcommit memory. There won't be a problem if you use a data type which
 *       overrides the packing, but you will possibly have extra padding within
 *       the header and after the data array. 
 *
 * diagram:
 *
-*         #-----------#------------#-------------#-------------------#
-*         #  destroy  #  capacity  #    count    #  data ----------> #
-*         #-----------#------------#-------------#-------------------#
+*   #---------#---------#-----------#------------#---------#-----------------#
+*   #  cache  #  queue  #  destroy  #  capacity  #  count  #  data --------> #
+*   #---------#---------#-----------#------------#---------#-----------------#
 *
-*         \____________________________________/ \__________________/
-*                     hidden metadata                exposed array
+*   \_____________________________________________________/ \________________/
+*                        hidden metadata                       exposed array
 *               
 *
 * note: The client does not need to interact with this structure or declare any
@@ -61,7 +63,7 @@ typedef array_item *darray;
 *       With a custom destructor, all responsibility of cleaning up dynamically
 *       allocated memory is pushed to the client. Therefore, once all elements 
 *       in data[] are appropriately destroyed, do not forget to free the struct 
-*       pointer itself.
+*       pointer itself and the cache/queue members.
 *
 *       example:
 *
@@ -73,7 +75,9 @@ typedef array_item *darray;
 *           {
 *               free(dh->data[i]);
 *           }
-*           
+*
+*           free(dh->cache);
+*           free(dh->queue);           
 *           free(dh);
 *       }
 *
@@ -81,6 +85,8 @@ typedef array_item *darray;
 
 struct darray_header
 {
+    void *cache;
+    array_item *queue;
     void (*destroy)(void *ptr);
     uint32_t capacity;
     uint32_t count;
@@ -128,33 +134,24 @@ int darray_append(darray *d, array_item element);
 * public function: darray_pop
 * purpose: pop element off end of array
 * @ d : darray, the same darray returned by constructor
-* @ popped_item : pointer to storage location for popped item or NULL to discard
-* returns: true if pop is successful, false otherwise
-* note: if items on the array are dynamically allocated, you must be careful to
-*       not pass NULL as the argument to popped_item, as this may result in a
-*       memory leak.
+* returns: pointer to popped item
 *******************************************************************************/
-bool darray_pop(darray d, array_item *popped_item);
+array_item darray_pop(darray d);
 
 /*******************************************************************************
 * public function: darray_popleft
 * purpose: pop element off front of array
 * @ d : darray, the same darray returned by constructor
-* @ popped_item : pointer to storage location for popped item or NULL to discard
-* returns: true if pop is successful, false otherwise
-* note: if items on the array are dynamically allocated, you must be careful to
-*       not pass NULL as the argument to popped_item, as this may result in a
-*       memory leak.
+* returns: pointer to popped item
 *******************************************************************************/
-bool darray_popleft(darray d, array_item *popped_item);
+array_item darray_popleft(darray d);
 
 /*******************************************************************************
 * public function: darray_peek
 * purpose: examine but do not pop the element at the end of the array
 * @ d : darray, the same darray returned by constructor
-* @ peeked_item : pointer to storage location for peeked item
-* returns: true if peek is successful, false otherwise
+* returns: pointer to peeked item
 *******************************************************************************/
-bool darray_peek(darray d, array_item *peeked_item);
+array_item darray_peek(darray d);
 
 #endif
