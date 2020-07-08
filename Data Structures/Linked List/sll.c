@@ -35,9 +35,9 @@ void sll_destroy(struct sll *s)
     assert(s != NULL && "input sll pointer is null");
     
     if (s->destroy == free)
-    {        
-        //free each node
-        for (uint32_t i = 0; i < s->size; ++i) sll_remove_idx(s, i);
+    {               
+        //free the individual list nodes first
+        while (s->head != NULL) sll_remove_idx(s, 0);
         
         //now we can free the sll struct
         free(s);

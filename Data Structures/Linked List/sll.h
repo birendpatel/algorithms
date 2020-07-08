@@ -107,6 +107,15 @@ struct node *sll_access_idx(struct sll *s, uint32_t idx);
 #define sll_access_tail(s) sll_access_tail(s, s->size - 1)
 
 #define sll_access_head_data(s) sll_access_idx(s, 0)->datum
-#define sll_access_tail_data(s) sll_acesss_idx(s, s->size - 1)->datum
+#define sll_access_tail_data(s) sll_access_idx(s, s->size - 1)->datum
+
+
+/*******************************************************************************
+* macro: sll_size
+* purpose: convenient access to size member in struct sll
+* @ s : pointer to struct sll
+* returns: unsigned 32 bit int of total nodes currently in list
+*******************************************************************************/
+#define sll_size(s) (s->size)
 
 #endif
