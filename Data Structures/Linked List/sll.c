@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "sll.h"
 
@@ -36,8 +37,8 @@ void sll_destroy(struct sll *s)
     
     if (s->destroy == free)
     {               
-        //free the individual list nodes first
-        while (s->head != NULL) sll_remove_idx(s, 0);
+        //free the individual list nodes first by popping off the heads
+        while (s->head != NULL) sll_remove_head(s);
         
         //now we can free the sll struct
         free(s);
@@ -146,4 +147,58 @@ struct node *sll_access_idx(struct sll *s, uint32_t idx)
     for (uint32_t i = 0; i < idx; ++i) curr = curr->next;
     
     return curr;
+}
+
+/******************************************************************************/
+
+struct node *sll_search_data(struct sll *s, sll_item datum)
+{
+    assert(s != NULL && "input sll pointer is null");
+    
+    for (struct node *curr = s->head; curr != NULL; curr = curr->next)
+    {
+        if (curr->datum == datum) return curr;
+    }
+    
+    return NULL;
+}
+
+/******************************************************************************/
+
+bool sll_concat(struct sll *to, struct sll *from, char method)
+{
+    assert(to != NULL && "to pointer is null");
+    assert(from != NULL && "from pointer is null");
+    assert(from->size > 0 && "from is empty, nothing to concatenate");
+    assert((method == 0 || method == 1 || method == 2) && "invalid method");
+    
+    switch(method)
+    {
+        case 0: //modify next pointer on tail of 'to' to point to head of 'from'
+                sll_access_tail(to)->next = from->head;
+                
+                //update metadata for 'to' list
+                to->size += from->size;
+                
+                //modify 'from' list to revert to empty state
+                from->head = NULL;
+                from->size = 0;
+                
+                break;
+                
+        case 1: //modify next pointer on tail of 'to' to point to head of 'from'
+                sll_access_tail(to)->next = from->head;
+                
+                //update metadata for 'to' list
+                to->size += from->size;
+                
+                break;
+                
+        case 2: 
+                break;
+                
+        default: return false;
+    }
+    
+    return true;
 }

@@ -7,6 +7,7 @@
 #define SLL_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*******************************************************************************
 * client-modifiable parameters
@@ -92,6 +93,40 @@ sll_item sll_remove_idx(struct sll *s, uint32_t idx);
 struct node *sll_access_idx(struct sll *s, uint32_t idx);
 
 /*******************************************************************************
+* public function: sll_search_data
+* purpose: sequential search for first node containing specified datum
+* @ s : pointer to struct sll
+* @ datum : the piece of data to search for
+* returns: pointer to struct node containing data, or null if not found
+*******************************************************************************/
+struct node *sll_search_data(struct sll *s, sll_item datum);
+
+/*******************************************************************************
+* public function: sll_concat
+* purpose: concatate 'from' with 'to', the tail of 'to' points to head of 'from'
+* @ to : pointer to struct sll, the list which gains the nodes
+* @ from : pointer to struct sll, the list which transfers its nodes
+* @ method : 0 - the 'from' list loses nodes and becomes an empty list.
+*            1 - the 'from' list retains all of its nodes.
+*            2 - the 'to' list gains a copy of all nodes in 'from'
+* returns: true on success, false on failure
+* note: method type 1 needs care to call sll_destroy on 'from' before 'to'
+* note: if null returned, then lists are reverted to original state before call
+* note: client is responsible for concatenating lists that logically make sense
+*       to concatenate. The data must be the same, the destructor should be the
+*       same, etc.
+*******************************************************************************/
+bool sll_concat(struct sll *to, struct sll *from, char method);
+
+/*******************************************************************************
+* macro: sll_size
+* purpose: convenient access to size member in struct sll
+* @ s : pointer to struct sll
+* returns: unsigned 32 bit int of total nodes currently in list
+*******************************************************************************/
+#define sll_size(s) (s->size)
+
+/*******************************************************************************
 * macros: *_head / *_tail
 * purpose: head and tail macro wrappers over _idx public functions
 * @ s : pointer to struct sll
@@ -104,18 +139,9 @@ struct node *sll_access_idx(struct sll *s, uint32_t idx);
 #define sll_remove_tail(s) sll_remove_idx(s, s->size - 1)
 
 #define sll_access_head(s) sll_access_idx(s, 0)
-#define sll_access_tail(s) sll_access_tail(s, s->size - 1)
+#define sll_access_tail(s) sll_access_idx(s, s->size - 1)
 
 #define sll_access_head_data(s) sll_access_idx(s, 0)->datum
 #define sll_access_tail_data(s) sll_access_idx(s, s->size - 1)->datum
-
-
-/*******************************************************************************
-* macro: sll_size
-* purpose: convenient access to size member in struct sll
-* @ s : pointer to struct sll
-* returns: unsigned 32 bit int of total nodes currently in list
-*******************************************************************************/
-#define sll_size(s) (s->size)
 
 #endif
