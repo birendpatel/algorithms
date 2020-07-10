@@ -104,19 +104,27 @@ struct node *sll_search_data(struct sll *s, sll_item datum);
 /*******************************************************************************
 * public function: sll_concat
 * purpose: concatate 'from' with 'to', the tail of 'to' points to head of 'from'
+*
 * @ to : pointer to struct sll, the list which gains the nodes
 * @ from : pointer to struct sll, the list which transfers its nodes
 * @ method : 0 - the 'from' list loses nodes and becomes an empty list.
 *            1 - the 'from' list retains all of its nodes.
 *            2 - the 'to' list gains a copy of all nodes in 'from'
-* returns: true on success, false on failure
+* @ destroy : if method 2 fails on malloc, then copied sll_items may need to be
+*             returned to memory. If not, pass null.
+*
+* returns: pointer to first new node on 'to', or NULL if malloc fails
+*
 * note: method type 1 needs care to call sll_destroy on 'from' before 'to'
 * note: if null returned, then lists are reverted to original state before call
-* note: client is responsible for concatenating lists that logically make sense
-*       to concatenate. The data must be the same, the destructor should be the
-*       same, etc.
 *******************************************************************************/
-bool sll_concat(struct sll *to, struct sll *from, char method);
+struct node *sll_concat
+(
+    struct sll *to, 
+    struct sll *from, 
+    char method, 
+    void (*destroy)(void *data)
+);
 
 /*******************************************************************************
 * macro: sll_size

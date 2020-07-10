@@ -10,7 +10,6 @@
 
 #include "sll.h"
 
-
 /*******************************************************************************
 * public functions
 *******************************************************************************/
@@ -165,17 +164,26 @@ struct node *sll_search_data(struct sll *s, sll_item datum)
 
 /******************************************************************************/
 
-bool sll_concat(struct sll *to, struct sll *from, char method)
+struct node *sll_concat
+(
+    struct sll *to, 
+    struct sll *from, 
+    char method, 
+    void (*destroy)(void *data)
+)
 {
     assert(to != NULL && "to pointer is null");
     assert(from != NULL && "from pointer is null");
     assert(from->size > 0 && "from is empty, nothing to concatenate");
     assert((method == 0 || method == 1 || method == 2) && "invalid method");
     
+    struct node *first_new_node;
+    
     switch(method)
     {
         case 0: //modify next pointer on tail of 'to' to point to head of 'from'
-                sll_access_tail(to)->next = from->head;
+                first_new_node = from->head;
+                sll_access_tail(to)->next = first_new_node;
                 
                 //update metadata for 'to' list
                 to->size += from->size;
@@ -187,18 +195,47 @@ bool sll_concat(struct sll *to, struct sll *from, char method)
                 break;
                 
         case 1: //modify next pointer on tail of 'to' to point to head of 'from'
-                sll_access_tail(to)->next = from->head;
+                first_new_node = from->head;
+                sll_access_tail(to)->next = first_new_node;
                 
                 //update metadata for 'to' list
                 to->size += from->size;
                 
                 break;
                 
-        case 2: 
-                break;
+        case 2: //copy nodes one by one
+                //until I create access/insert/remove by node, this is very slow
                 
-        default: return false;
+                for (uint32_t i = 0; i < from->size; ++i)
+                {
+                    sll_item copy = sll_access_idx(from, i)->datum;
+                    
+                    struct node *ins_node = sll_insert_tail(to, copy);
+                    
+                    //malloc failed, revert to state prior to function entry
+                    if (ins_node == NULL)
+                    {
+                        //remove nodes that succesfully copied on previous iters
+                        for (uint32_t j = 0; j < i; j++)
+                        {
+                            sll_item datum = sll_remove_tail(to);
+                            
+                            //if sll_item was allocated, free the memory
+                            if (destroy != NULL)
+                            {
+                                (*destroy)(datum);
+                            }
+                        }
+                        
+                        return NULL;
+                    }
+                    //end revert block
+                    
+                    if (i == 0) first_new_node = ins_node;
+                }
+                
+                break;
     }
     
-    return true;
+    return first_new_node;
 }
