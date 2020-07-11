@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "sll.h"
 #include "src/unity.h"
@@ -184,6 +185,89 @@ void test_search_for_non_existent_data_is_a_failure(void)
 }
 
 /******************************************************************************/
+
+void test_search_for_existing_node_is_successful(void)
+{
+    //given a singly linked list with a few nodes
+    struct sll *list = sll_create(free);
+    struct node *search_node =  sll_insert_head(list, "butane");
+    sll_insert_head(list, "methane");
+    sll_insert_head(list, "propane");
+    
+    //when we search for the tail node
+    bool found = sll_search_node(list, search_node);
+    
+    //then we find it
+    TEST_ASSERT_TRUE(found);
+    
+    //afterwards clean up memory
+    sll_destroy(list);    
+}
+
+/******************************************************************************/
+
+void test_search_for_tail_node_after_type_0_concat_is_successful(void)
+{
+    //given two singly linked lists
+    struct sll *list_1 = sll_create(free);
+    struct sll *list_2 = sll_create(free);
+    
+    sll_insert_head(list_1, "methane");
+    sll_insert_head(list_1, "propane");
+    
+    struct node *tail = sll_insert_head(list_2, "silver");
+    struct node *head = sll_insert_head(list_2, "gold");
+    
+    //when we concatenate the second list to the first with the type 0 method
+    struct node *first_new_node = sll_concat(list_1, list_2, 0, NULL);
+    
+    //then both nodes from list two are redirected and list one becomes empty
+    TEST_ASSERT_EQUAL_STRING("gold", first_new_node->datum);
+    TEST_ASSERT_TRUE(sll_search_node(list_1, head));
+    TEST_ASSERT_TRUE(sll_search_node(list_1, tail));
+    TEST_ASSERT_EQUAL_INT(4, sll_size(list_1));
+    TEST_ASSERT_EQUAL_INT(0, sll_size(list_2));
+    TEST_ASSERT_NULL(list_2->head);
+    
+    //afterwards clean up memory
+    sll_destroy(list_1);
+    sll_destroy(list_2);
+}
+
+/******************************************************************************/
+
+void test_search_for_tail_node_after_type_1_concat_is_successful(void)
+{
+    //given two singly linked lists
+    struct sll *list_1 = sll_create(free);
+    struct sll *list_2 = sll_create(free);
+    
+    sll_insert_head(list_1, "methane");
+    sll_insert_head(list_1, "propane");
+    
+    struct node *tail = sll_insert_head(list_2, "silver");
+    struct node *head = sll_insert_head(list_2, "gold");
+    
+    //when we concatenate the second list to the first with the type 0 method
+    struct node *first_new_node = sll_concat(list_1, list_2, 1, NULL);
+    
+    //then head node of list 2 gains a silent pointer from list 1 tail
+    TEST_ASSERT_EQUAL_STRING("gold", first_new_node->datum);
+    TEST_ASSERT_TRUE(sll_search_node(list_1, head));
+    TEST_ASSERT_TRUE(sll_search_node(list_1, tail));
+    TEST_ASSERT_EQUAL_INT(4, sll_size(list_1));
+    
+    TEST_ASSERT_TRUE(sll_search_node(list_2, head));
+    TEST_ASSERT_TRUE(sll_search_node(list_2, tail));
+    TEST_ASSERT_EQUAL_INT(2, sll_size(list_2));
+    TEST_ASSERT_NOT_NULL(list_2->head);
+    
+    //afterwards clean up memory
+    sll_destroy(list_1);
+    sll_destroy(list_2);
+}
+
+/******************************************************************************/
 //integration test for memory leaks uses DynamoRio. unity framework not used.
 
 int integration_test_does_not_result_in_a_memory_leak(void)
@@ -225,6 +309,9 @@ int main(void)
         RUN_TEST(test_removal_of_all_nodes_retains_null_head_pointer);
         RUN_TEST(test_search_for_existing_data_is_successful);
         RUN_TEST(test_search_for_non_existent_data_is_a_failure);
+        RUN_TEST(test_search_for_existing_node_is_successful);
+        RUN_TEST(test_search_for_tail_node_after_type_0_concat_is_successful);
+        RUN_TEST(test_search_for_tail_node_after_type_1_concat_is_successful);
     UNITY_END();
     
     INTEGRATION_BEGIN();

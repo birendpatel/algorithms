@@ -24,6 +24,7 @@ struct sll *sll_create(void (*destroy)(void *object))
     s->destroy = destroy;
     s->head = NULL;
     s->size = 0;
+    s->has_type_1_concat = false;
     
     return s;
 }
@@ -35,9 +36,16 @@ void sll_destroy(struct sll *s)
     assert(s != NULL && "input sll pointer is null");
     
     if (s->destroy == free)
-    {               
-        //free the individual list nodes first by popping off the heads
-        while (s->head != NULL) sll_remove_head(s);
+    {
+        //if this list has a type 1 concat, then the client should have already
+        //destroyed the parent list. This destruction doesn't influence the
+        //metadata on the current list so it has a dangling head pointer. In
+        //which case we want to skip this branch.
+        if (s->has_type_1_concat == false)
+        {
+            //free the individual list nodes first by popping off the heads
+            while (s->head != NULL) sll_remove_head(s);
+        }
         
         //now we can free the sll struct
         free(s);
@@ -150,6 +158,21 @@ struct node *sll_access_idx(struct sll *s, uint32_t idx)
 
 /******************************************************************************/
 
+bool sll_search_node(struct sll *s, struct node *search_node)
+{
+    assert(s != NULL && "input sll pointer is null");
+    assert(search_node != NULL && "input search node is null");
+    
+    for (struct node *curr = s->head; curr != NULL; curr = curr->next)
+    {
+        if (curr == search_node) return true;
+    }
+    
+    return false;
+}
+
+/******************************************************************************/
+
 struct node *sll_search_data(struct sll *s, sll_item datum)
 {
     assert(s != NULL && "input sll pointer is null");
@@ -200,6 +223,9 @@ struct node *sll_concat
                 
                 //update metadata for 'to' list
                 to->size += from->size;
+                
+                //modify 'from' concat flag so that destroy call will not fail
+                from->has_type_1_concat = true;
                 
                 break;
                 

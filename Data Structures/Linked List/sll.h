@@ -32,6 +32,8 @@ struct node
 * purpose: client must declare pointer to this struct to access the API
 * @ destroy : pointer to function used to clean up memory on destructor call
 * @ head : pointer to the first node in the list
+* @ size : number of nodes in list
+* @ has_type_1_concat : flag that this list has been concatenated with type 1
 *
 *
 *       SLL  
@@ -46,7 +48,8 @@ struct sll
 {
     void (*destroy)(void *object);
     struct node *head;
-    uint32_t size;    
+    uint32_t size;
+    bool has_type_1_concat;
 };
 
 /*******************************************************************************
@@ -91,6 +94,17 @@ sll_item sll_remove_idx(struct sll *s, uint32_t idx);
 * returns: pointer to struct node at specified index
 *******************************************************************************/
 struct node *sll_access_idx(struct sll *s, uint32_t idx);
+
+/*******************************************************************************
+* public function: sll_search_node
+* purpose: sequential search for first node matching input node
+* @ s : pointer to struct sll
+* @ search_node : pointer to struct node
+* returns: true if node in list, else false.
+* note: probably wouldnt use this unless you need some sanity checks after lots
+*       of type 1 sll_concat calls on many linked lists. 
+*******************************************************************************/
+bool sll_search_node(struct sll *s, struct node *search_node);
 
 /*******************************************************************************
 * public function: sll_search_data
