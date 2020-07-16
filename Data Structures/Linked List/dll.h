@@ -67,12 +67,32 @@ struct dll *dll_create(void (*destroy)(void *data));
 void dll_destroy(struct dll *list);
 
 /*******************************************************************************
-* public function: dll_insert_idx
-* purpose: insert a new node at the specified index
+* public function: dll_insert_pos
+* purpose: insert a new node at the specified position
 * @ list : pointer to struct dll
+* @ pos : position of insertion, equal to size of list for tail entry
 * @ datum : the piece of data to store in the new node
 * returns: pointer to the new node if successful, else NULL
 *******************************************************************************/
-struct dll_node *dll_insert_idx(struct dll *list, dll_item datum);
+struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum);
+
+/*******************************************************************************
+* public function: dll_remove_pos
+* purpose: remove a node at the specified position
+* @ list : pointer to struct dll
+* @ pos : position of removal, equal to size of list - 1 for tail removal
+* returns: datum stored at removed node 
+*******************************************************************************/
+dll_item dll_remove_pos(struct dll *list, uint32_t pos);
+
+/*******************************************************************************
+* purpose: insertion and removal macros for head and tail 
+*******************************************************************************/
+#define dll_push_head(list, datum) dll_insert_idx(list, 0, datum);
+#define dll_pop_head(list) dll_remove_pos(list, 0);
+
+#define dll_push_tail(list, datum) dll_insert_idx(list, list->size, datum);
+#define dll_pop_tail(list) dll_remove_pos(list, list->size);
+
 
 #endif
