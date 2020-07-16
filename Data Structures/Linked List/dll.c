@@ -16,7 +16,7 @@ struct dll *dll_create(void (*destroy)(void *data))
 {
     //allocate memory for returning struct
     struct dll *list = malloc(sizeof(struct dll));
-    if (list == NULL) return NULL:
+    if (list == NULL) return NULL;
     
     //populate dll members
     list->destroy = destroy;
@@ -30,7 +30,17 @@ struct dll *dll_create(void (*destroy)(void *data))
 /******************************************************************************/
 
 void dll_destroy(struct dll *list)
-{}
+{
+    assert(list != NULL && "input list pointer is null");
+    
+    while (list->head != NULL)
+    {
+        if (list->destroy == NULL) dll_pop_head(list);
+        else (*list->destroy)(dll_pop_head(list));
+    }
+    
+    free(list);
+}
 
 /******************************************************************************/
 
@@ -71,22 +81,22 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum)
         {
             //insert at tail
             new_node->prev = list->tail;
-            new_node_next = NULL;
+            new_node->next = NULL;
             list->tail = new_node;
         }
         else
         {
             //insert within list starting at the first non-head node
-            struct dll_node *curr = (list->head)->next;
+            struct dll_node *curr = list->head->next;
             
             //walk the list to find the node to be shifted
             for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
-            assert(curr != (list->tail)->next && "walked off end of list");
+            assert(curr != NULL && "walked off end of list");
             
             //insert new node at this location
             new_node->prev = curr->prev;
             new_node->next = curr;
-            (new_node->prev)->next = new_node;
+            new_node->prev->next = new_node;
             curr->prev = new_node;
         }
     }
@@ -109,10 +119,10 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos)
         //remove head
         removed_node = list->head;
         
-        list->head = (list->head)->next;
+        list->head = list->head->next;
         
         if (list->head == NULL) list->tail = NULL;
-        else (list->head)->prev = NULL;
+        else list->head->prev = NULL;
         
     }
     else if (pos == list->size - 1)
@@ -120,24 +130,24 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos)
         //remove tail
         removed_node = list->tail;
         
-        list->tail = (list->tail)->prev;
+        list->tail = list->tail->prev;
         
         if (list->tail == NULL) list->head = NULL;
-        else (list->tail)->next = NULL;
+        else list->tail->next = NULL;
     }
     else
     {
         //remove within list starting at the first non-head node
-        struct dll_node *curr = (list->head)->next;
+        struct dll_node *curr = list->head->next;
         
         //walk the list to find the node to be removed
         for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
-        assert(curr != (list->tail)->next && "walked off end of list");
+        assert(curr != list->tail->next && "walked off end of list");
         removed_node = curr;
         
         //use found node to connect its prev and next nodes together
-        (curr->next)->prev = curr->prev;
-        (curr->prev)->next = curr->next;        
+        curr->next->prev = curr->prev;
+        curr->prev->next = curr->next;        
     }
     
     //remove data from node, update metadata, and clean up memory
@@ -147,5 +157,49 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos)
     
     --list->size;
     
-    return removed_item;
+    return datum;
+}
+
+int main(void)
+{
+    return 0;
+}
+
+/******************************************************************************/
+
+dll_item dll_access_pos(struct dll *list, uint32_t pos)
+{
+    assert(list != NULL && "input list pointer is null");
+    assert(pos < list->size && "position out of bounds");
+    
+    if (pos == 0)
+    {
+        return list->head->datum;
+    }
+    else if (pos == list->size - 1)
+    {
+        return list->tail->datum;
+    }
+    else
+    {
+        struct dll_node *curr = list->head->next;
+        
+        for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
+        
+        return curr->datum;
+    }
+}
+
+/******************************************************************************/
+
+dll_search(struct dll *list, dll_item datum)
+{
+    assert(list != NULL && "input list pointer is null");
+    
+    for (struct dll_node *curr = list->head; curr != NULL; curr=curr->next)
+    {
+        if (curr->datum = datum) return curr;
+    }
+    
+    return NULL;
 }
