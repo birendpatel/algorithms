@@ -51,6 +51,8 @@ struct dll
     uint32_t size;
 };
 
+//constructors
+
 /*******************************************************************************
 * public function: dll_create
 * purpose: constructor
@@ -65,6 +67,8 @@ struct dll *dll_create(void (*destroy)(void *data));
 * @ list : pointer to struct dll
 *******************************************************************************/
 void dll_destroy(struct dll *list);
+
+//positional functions
 
 /*******************************************************************************
 * public function: dll_insert_pos
@@ -94,6 +98,12 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos);
 *******************************************************************************/
 dll_item dll_access_pos(struct dll *list, uint32_t pos);
 
+//nodal functions
+
+
+
+//utilities
+
 /*******************************************************************************
 * public function: dll_search
 * purpose: search for data within the list
@@ -103,6 +113,28 @@ dll_item dll_access_pos(struct dll *list, uint32_t pos);
 * returns: the first dll_node containing the data, null if not found
 *******************************************************************************/
 struct dll_node *dll_search(struct dll *list, dll_item datum, char method);
+
+/*******************************************************************************
+* public function: dll_concat
+* purpose: concatenate nodes from list B to tail of list A, list B becomes empty
+* @ A : pointer to struct dll
+* @ B : pointer to struct dll
+* returns: pointer to first new node in list A
+*******************************************************************************/
+struct dll_node *dll_concat(struct dll *A, struct dll *B);
+
+
+/*******************************************************************************
+* public function: dll_copy
+* purpose: deep copy nodes from list B to tail of list A, list B is preserved
+* @ A : pointer to struct dll
+* @ B : pointer to struct dll
+* returns: pointer to first new node in list A, NULL if copy failed.
+* note: if returned null, list A reverted to state prior to function call
+*******************************************************************************/
+struct dll_node *dll_copy(struct dll *A, struct dll *B);
+
+//macros
 
 /*******************************************************************************
 * macro: dll_size

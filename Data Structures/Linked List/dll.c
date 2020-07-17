@@ -229,3 +229,69 @@ struct dll_node *dll_search(struct dll *list, dll_item datum, char method)
     
     return NULL;
 }
+
+/******************************************************************************/
+
+struct dll_node *dll_concat(struct dll *A, struct dll *B)
+{
+    assert(A != NULL && "input list pointer A is null");
+    assert(B != NULL && "input list pointer B is null");
+    
+    assert(A->size != 0 && "nothing to concatenate to");
+    assert(B->size != 0 && "nothing to concatenate from");
+    
+    //set up new links between tail of A and head of B
+    A->tail->next = B->head;
+    B->head->prev = A->tail;
+    A->tail = B->tail;
+    
+    //update metadata on A
+    A->size += B->size;
+    
+    //get ret val
+    struct dll_node *ret_node = B->head;
+    
+    //make B empty list
+    B->head = NULL;
+    B->tail = NULL;
+    B->size = 0;
+    
+    return ret_node;
+}
+
+/******************************************************************************/
+
+struct dll_node *dll_copy(struct dll *A, struct dll *B)
+{
+    assert(A != NULL && "input list pointer A is null");
+    assert(B != NULL && "input list pointer B is null");
+    assert(B->size != 0 && "nothing to concatenate");
+    
+    struct dll_node *ret_node;
+    struct dll_node *old_tail = A->tail;
+    
+    //walk list B and copy node data to list A one by one    
+    for (struct dll_node *curr = B->head; curr != NULL; curr = curr->next)
+    {
+        struct dll_node *push_node = dll_push_tail(A, curr->datum);
+        
+        //malloc failure on push
+        if (push_node == NULL)
+        {
+            //revert list_1 to its state prior to the function call
+            while (dll_peek_tail(A) != old_tail)
+            {
+                //use supplied destroy member on constructor if available
+                if (A->destroy == NULL) dll_pop_tail(A);
+                else (*A->destroy)(dll_pop_tail(A));
+            }
+            
+            return NULL;
+        }
+        
+        //capture return node on first iter
+        if (curr == B->head) ret_node = push_node;
+    }
+    
+    return ret_node;
+}

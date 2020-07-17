@@ -280,6 +280,69 @@ void test_access_in_middle_of_list(void)
 }
 
 /******************************************************************************/
+
+void test_concat_two_lists_is_successful(void)
+{
+    //given two lists
+    struct dll *list_1 = dll_create(NULL);
+    struct dll *list_2 = dll_create(NULL);
+    
+    dll_push_head(list_1, "C");
+    dll_push_head(list_1, "B");
+    dll_push_head(list_1, "A");
+    
+    dll_push_head(list_2, "F");
+    dll_push_head(list_2, "E");
+    dll_push_head(list_2, "D");
+    
+    //when list 2 is concatenated to list 1
+    struct dll_node *new_node = dll_concat(list_1, list_2);
+    dll_destroy(list_2);
+    
+    //then it is successful
+    TEST_ASSERT_EQUAL_STRING("D", new_node->datum);
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
+    TEST_ASSERT_EQUAL_INT(6, dll_size(list_1));
+    
+    //afterwards clean up memory
+    dll_destroy(list_1);
+    
+}
+
+/******************************************************************************/
+
+void test_deep_copy_two_lists_is_successful(void)
+{
+    //given two lists
+    struct dll *list_1 = dll_create(NULL);
+    struct dll *list_2 = dll_create(NULL);
+    
+    dll_push_head(list_1, "C");
+    dll_push_head(list_1, "B");
+    dll_push_head(list_1, "A");
+    
+    dll_push_head(list_2, "F");
+    dll_push_head(list_2, "E");
+    dll_push_head(list_2, "D");
+    
+    //when a copy of list 2 is performed
+    struct dll_node *new_node = dll_copy(list_1, list_2);
+    
+    //then it is successful
+    TEST_ASSERT_EQUAL_STRING("D", new_node->datum);
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
+    TEST_ASSERT_EQUAL_INT(6, dll_size(list_1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_2, "F", 1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_2, "D", 2));
+    
+    //afterwards clean up memory
+    dll_destroy(list_1);
+    dll_destroy(list_2);    
+}
+
+/******************************************************************************/
 //integration test with DynamoRio, not Unity
 
 struct point
@@ -338,6 +401,8 @@ int main(void)
         RUN_TEST(test_removal_at_tail_of_non_empty_list);
         RUN_TEST(test_removal_in_middle_of_list_does_not_break_list_links);
         RUN_TEST(test_access_in_middle_of_list);
+        RUN_TEST(test_concat_two_lists_is_successful);
+        RUN_TEST(test_deep_copy_two_lists_is_successful);
     UNITY_END();
     
     INTEGRATION_BEGIN();
