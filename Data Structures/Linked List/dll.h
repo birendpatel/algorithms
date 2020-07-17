@@ -7,6 +7,7 @@
 #define DLL_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*******************************************************************************
 * purpose: user-modifiable hyperparameters
@@ -100,9 +101,43 @@ dll_item dll_access_pos(struct dll *list, uint32_t pos);
 
 //nodal functions
 
+/*******************************************************************************
+* public function: dll_insert_node
+* purpose: insert a node after or before the input node
+* @ list : pointer to struct dll
+* @ node : pointer to node after or before which to insert
+* @ datum : the piece of data stored at the new node
+* @ method : 1 for insert after, 2 for insert before
+* returns : pointer to the new node if successful, else NULL
+*******************************************************************************/
+struct dll_node *dll_insert_node
+(
+    struct dll *list, 
+    struct dll_node *node, 
+    dll_item datum,
+    char method
+);
 
+/*******************************************************************************
+* public function: dll_remove_node
+* purpose: remove the input node
+* @ list : pointer to struct dll
+* @ node : pointer to node requiring removal
+* returns: datum stored at removed node
+*******************************************************************************/
+dll_item dll_remove_node(struct dll *list, struct dll_node *node);
 
 //utilities
+
+/*******************************************************************************
+* public function: dll_search_node
+* purpose: search for a node within the list
+* @ list : pointer to struct dll
+* @ node : search criterion
+* @ method : 1 to begin search at head, 2 to begin at tail
+* @ returns: true if found, false otherwise
+*******************************************************************************/
+bool dll_search_node(struct dll *list, struct dll_node *node, char method);
 
 /*******************************************************************************
 * public function: dll_search
@@ -122,7 +157,6 @@ struct dll_node *dll_search(struct dll *list, dll_item datum, char method);
 * returns: pointer to first new node in list A
 *******************************************************************************/
 struct dll_node *dll_concat(struct dll *A, struct dll *B);
-
 
 /*******************************************************************************
 * public function: dll_copy

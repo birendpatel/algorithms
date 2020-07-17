@@ -343,6 +343,98 @@ void test_deep_copy_two_lists_is_successful(void)
 }
 
 /******************************************************************************/
+
+void test_removal_of_first_new_node_after_concatenation(void)
+{
+    //given two lists
+    struct dll *list_1 = dll_create(NULL);
+    struct dll *list_2 = dll_create(NULL);
+    
+    dll_push_head(list_1, "C");
+    dll_push_head(list_1, "B");
+    dll_push_head(list_1, "A");
+    
+    dll_push_head(list_2, "F");
+    dll_push_head(list_2, "E");
+    dll_push_head(list_2, "D");
+    
+    //when the first new node after a concatenation is removed
+    dll_item SUT = dll_remove_node(list_1, dll_concat(list_1, list_2));
+    
+    //then it does not disrupt concatenation
+    TEST_ASSERT_EQUAL_STRING("D", SUT);
+    TEST_ASSERT_EQUAL_INT(5, dll_size(list_1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
+    
+    //afterwards clean up memory
+    dll_destroy(list_1);
+    dll_destroy(list_2);
+}
+
+/******************************************************************************/
+
+void test_insert_node_before_first_new_node_after_concat(void)
+{
+    //given two lists
+    struct dll *list_1 = dll_create(NULL);
+    struct dll *list_2 = dll_create(NULL);
+    
+    dll_push_head(list_1, "C");
+    dll_push_head(list_1, "B");
+    dll_push_head(list_1, "A");
+    
+    dll_push_head(list_2, "F");
+    dll_push_head(list_2, "E");
+    dll_push_head(list_2, "D");
+    
+    //when a new node is inserted before first new node after concatenation
+    struct dll_node *first_new_node = dll_concat(list_1, list_2);
+    struct dll_node *SUT = dll_insert_node(list_1, first_new_node, "Z", 2);
+    
+    //then it is successful
+    TEST_ASSERT_EQUAL_STRING("Z", SUT->datum);
+    TEST_ASSERT_EQUAL_INT(7, dll_size(list_1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
+    
+    //afterwards clean up memory
+    dll_destroy(list_1);
+    dll_destroy(list_2);   
+}
+
+/******************************************************************************/
+
+void test_insert_node_after_first_new_node_after_concat(void)
+{
+    //given two lists
+    struct dll *list_1 = dll_create(NULL);
+    struct dll *list_2 = dll_create(NULL);
+    
+    dll_push_head(list_1, "C");
+    dll_push_head(list_1, "B");
+    dll_push_head(list_1, "A");
+    
+    dll_push_head(list_2, "F");
+    dll_push_head(list_2, "E");
+    dll_push_head(list_2, "D");
+    
+    //when a new node is inserted before first new node after concatenation
+    struct dll_node *first_new_node = dll_concat(list_1, list_2);
+    struct dll_node *SUT = dll_insert_node(list_1, first_new_node, "Z", 1);
+    
+    //then it is successful
+    TEST_ASSERT_EQUAL_STRING("Z", SUT->datum);
+    TEST_ASSERT_EQUAL_INT(7, dll_size(list_1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
+    TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
+    
+    //afterwards clean up memory
+    dll_destroy(list_1);
+    dll_destroy(list_2);   
+}
+
+/******************************************************************************/
 //integration test with DynamoRio, not Unity
 
 struct point
@@ -377,7 +469,7 @@ int integration_test_does_not_result_in_a_memory_leak(void)
         free(dll_pop_head(list));
     }
     
-    //when the list is destroy
+    //when the list is destroyed
     dll_destroy(list);
     
     //then DynamoRio will not detect a memory leak
@@ -403,6 +495,9 @@ int main(void)
         RUN_TEST(test_access_in_middle_of_list);
         RUN_TEST(test_concat_two_lists_is_successful);
         RUN_TEST(test_deep_copy_two_lists_is_successful);
+        RUN_TEST(test_removal_of_first_new_node_after_concatenation);
+        RUN_TEST(test_insert_node_before_first_new_node_after_concat);
+        RUN_TEST(test_insert_node_after_first_new_node_after_concat);
     UNITY_END();
     
     INTEGRATION_BEGIN();

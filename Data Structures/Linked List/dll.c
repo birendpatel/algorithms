@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "dll.h"
 
@@ -197,6 +198,137 @@ dll_item dll_access_pos(struct dll *list, uint32_t pos)
         
         return curr->datum;
     }
+}
+
+/******************************************************************************/
+
+struct dll_node *dll_insert_node
+(
+    struct dll *list,
+    struct dll_node *node,
+    dll_item datum,
+    char method
+)
+{
+    assert(list != NULL && "input list pointer is null");
+    assert((node == NULL || dll_search_node(list, node, 1)) && "no node");
+    assert(!(node == NULL && list->size != 0) && "null node on non empty list");
+    assert((method == 1 || method == 2) && "invalid method");
+    
+    struct dll_node *new_node = malloc(sizeof(struct dll_node));
+    if (new_node == NULL) return NULL;
+    
+    if (list->size == 0)
+    {
+        //insert into empty list
+        new_node->prev = NULL;
+        new_node->next = NULL;
+        
+        list->head = new_node;
+        list->tail = new_node;
+        
+    }
+    else
+    {
+        if (method == 1)
+        {
+            //insert after the input node
+            new_node->prev = node;
+            new_node->next = node->next;
+            node->next = new_node;
+            
+            if (new_node->next == NULL) list->tail = new_node;
+            else new_node->next->prev = new_node;
+        }
+        else if (method == 2)
+        {
+            //insert before the input node
+            new_node->prev = node->prev;
+            new_node->next = node;
+            node->prev = new_node;
+            
+            if (new_node->prev == NULL) list->head = new_node;
+            else new_node->prev->next = new_node;
+        }
+    }
+    
+    //place data in new node
+    new_node->datum = datum;
+    
+    //update metadata
+    ++list->size;
+    
+    return new_node;
+}
+
+/******************************************************************************/
+
+dll_item dll_remove_node(struct dll *list, struct dll_node *node)
+{
+    assert(list != NULL && "input list pointer is null");
+    assert(node != NULL && "input node pointer is null");
+    assert(dll_search_node(list, node, 1) == true && "node not in list");
+    
+    //same as dll_remove_pos but without list walk, so O(1) complexity
+    if (node == list->head)
+    {
+        list->head = list->head->next;
+        
+        if (list->head == NULL) list->tail = NULL;
+        else list->head->prev = NULL;
+    }
+    else if (node == list->tail)
+    {
+        list->tail = list->tail->prev;
+        
+        if (list->tail == NULL) list->head = NULL;
+        else list->tail->next = NULL;
+    }
+    else
+    {
+        node->next->prev = node->prev;
+        node->prev->next = node->next;
+    }
+    
+    dll_item datum = node->datum;
+    
+    free(node);
+    
+    --list->size;
+    
+    return datum;
+}
+
+/******************************************************************************/
+
+bool dll_search_node(struct dll *list, struct dll_node *node, char method)
+{
+    assert(list != NULL && "input list pointer is null");
+    assert(node != NULL && "input node pointer is null");
+    assert((method == 1 || method == 2) && "invalid method type");
+    
+    switch(method)
+    {
+        case 1:
+        
+        for (struct dll_node *curr = list->head; curr != NULL; curr=curr->next)
+        {
+            if (curr == node) return true;
+        }
+        
+        break;
+        
+        case 2:
+        
+        for (struct dll_node *curr = list->tail; curr != NULL; curr=curr->prev)
+        {
+            if (curr == node) return true;
+        }
+        
+        break;
+    }
+    
+    return false;
 }
 
 /******************************************************************************/
