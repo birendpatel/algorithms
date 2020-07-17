@@ -53,18 +53,14 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum)
     struct dll_node *new_node = malloc(sizeof(struct dll_node));
     if (new_node == NULL) return NULL;
     
-    //place data in new node
-    new_node->datum = datum;
-    
-    //update metadata
-     ++list->size;
-    
     //configure pointers in metadata and the new node
     if (list->size == 0)
     {
-        //insert into empty list
+        //insert into empty list, first set pointers on new node
         new_node->prev = NULL;
         new_node->next = NULL;
+        
+        //now set metadata pointers
         list->head = new_node;
         list->tail = new_node;
     }
@@ -72,16 +68,26 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum)
     {
         if (pos == 0)
         {
-            //insert at head
+            //insert at head, first set pointers on new node
             new_node->prev = NULL;
             new_node->next = list->head;
+            
+            //update old head to point back to new node
+            list->head->prev = new_node;
+            
+            //update list metadata head pointer
             list->head = new_node;
         }
         else if (pos == list->size)
         {
-            //insert at tail
+            //insert at tail, first set pointers on new node
             new_node->prev = list->tail;
             new_node->next = NULL;
+            
+            //update old tail to point toward new node
+            list->tail->next = new_node;
+            
+            //update list metadata tail pointer
             list->tail = new_node;
         }
         else
@@ -93,14 +99,22 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum)
             for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
             assert(curr != NULL && "walked off end of list");
             
-            //insert new node at this location
+            //insert new node at this location, first update new node
             new_node->prev = curr->prev;
             new_node->next = curr;
+            
+            //update pointers on neighbor nodes
             new_node->prev->next = new_node;
             curr->prev = new_node;
         }
     }
     
+    //place data in new node
+    new_node->datum = datum;
+    
+    //update metadata
+    ++list->size;
+     
     return new_node;
 }
 
@@ -160,11 +174,6 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos)
     return datum;
 }
 
-int main(void)
-{
-    return 0;
-}
-
 /******************************************************************************/
 
 dll_item dll_access_pos(struct dll *list, uint32_t pos)
@@ -192,13 +201,30 @@ dll_item dll_access_pos(struct dll *list, uint32_t pos)
 
 /******************************************************************************/
 
-dll_search(struct dll *list, dll_item datum)
+struct dll_node *dll_search(struct dll *list, dll_item datum, char method)
 {
     assert(list != NULL && "input list pointer is null");
+    assert((method == 1 || method == 2) && "invalid method type");
     
-    for (struct dll_node *curr = list->head; curr != NULL; curr=curr->next)
+    switch(method)
     {
-        if (curr->datum = datum) return curr;
+        case 1:
+        
+        for (struct dll_node *curr = list->head; curr != NULL; curr=curr->next)
+        {
+            if (curr->datum == datum) return curr;
+        }
+        
+        break;
+        
+        case 2:
+
+        for (struct dll_node *curr = list->tail; curr != NULL; curr=curr->prev)
+        {
+            if (curr->datum == datum) return curr;
+        }   
+            
+        break;
     }
     
     return NULL;

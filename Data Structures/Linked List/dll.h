@@ -99,9 +99,10 @@ dll_item dll_access_pos(struct dll *list, uint32_t pos);
 * purpose: search for data within the list
 * @ list : pointer to struct dll
 * @ datum : search criterion
+* @ method : 1 to begin search at head, 2 to begin at tail.
 * returns: the first dll_node containing the data, null if not found
 *******************************************************************************/
-struct dll_node *dll_search(struct dll *list, dll_item datum);
+struct dll_node *dll_search(struct dll *list, dll_item datum, char method);
 
 /*******************************************************************************
 * macro: dll_size
@@ -113,11 +114,11 @@ struct dll_node *dll_search(struct dll *list, dll_item datum);
 * macro: push/pop/peek + head/tail
 * purpose: insertion, removal, and access macros for head and tail 
 *******************************************************************************/
-#define dll_push_head(list, datum) dll_insert_idx(list, 0, datum)
+#define dll_push_head(list, datum) dll_insert_pos(list, 0, datum)
 #define dll_pop_head(list) dll_remove_pos(list, 0)
 #define dll_peek_head(list) dll_access_pos(list, 0)
 
-#define dll_push_tail(list, datum) dll_insert_idx(list, list->size, datum)
+#define dll_push_tail(list, datum) dll_insert_pos(list, list->size, datum)
 #define dll_pop_tail(list) dll_remove_pos(list, list->size - 1)
 #define dll_peek_tail(list) dll_access_pos(list, list->size - 1)
 
