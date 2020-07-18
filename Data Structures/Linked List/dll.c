@@ -1,6 +1,6 @@
 /*
 * Author: Biren Patel
-* Description: Doubly linked list implementation
+* Description: Generic doubly linked list implementation via void pointers.
 */
 
 #include <stdlib.h>
@@ -45,7 +45,7 @@ void dll_destroy(struct dll *list)
 
 /******************************************************************************/
 
-struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum)
+struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos <= list->size && "position out of bounds");
@@ -122,7 +122,7 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum)
 
 /******************************************************************************/
 
-dll_item dll_remove_pos(struct dll *list, uint32_t pos)
+void *dll_remove_pos(struct dll *list, uint32_t pos)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos < list->size && "position out of bounds");
@@ -166,7 +166,7 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos)
     }
     
     //remove data from node, update metadata, and clean up memory
-    dll_item datum = removed_node->datum;
+    void *datum = removed_node->datum;
     
     free(removed_node);
     
@@ -177,7 +177,7 @@ dll_item dll_remove_pos(struct dll *list, uint32_t pos)
 
 /******************************************************************************/
 
-dll_item dll_access_pos(struct dll *list, uint32_t pos)
+void *dll_access_pos(struct dll *list, uint32_t pos)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos < list->size && "position out of bounds");
@@ -206,7 +206,7 @@ struct dll_node *dll_insert_node
 (
     struct dll *list,
     struct dll_node *node,
-    dll_item datum,
+    void *datum,
     char method
 )
 {
@@ -263,7 +263,7 @@ struct dll_node *dll_insert_node
 
 /******************************************************************************/
 
-dll_item dll_remove_node(struct dll *list, struct dll_node *node)
+void *dll_remove_node(struct dll *list, struct dll_node *node)
 {
     assert(list != NULL && "input list pointer is null");
     assert(node != NULL && "input node pointer is null");
@@ -290,7 +290,7 @@ dll_item dll_remove_node(struct dll *list, struct dll_node *node)
         node->prev->next = node->next;
     }
     
-    dll_item datum = node->datum;
+    void *datum = node->datum;
     
     free(node);
     
@@ -333,7 +333,7 @@ bool dll_search_node(struct dll *list, struct dll_node *node, char method)
 
 /******************************************************************************/
 
-struct dll_node *dll_search(struct dll *list, dll_item datum, char method)
+struct dll_node *dll_search(struct dll *list, void *datum, char method)
 {
     assert(list != NULL && "input list pointer is null");
     assert((method == 1 || method == 2) && "invalid method type");

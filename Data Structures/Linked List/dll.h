@@ -1,6 +1,6 @@
 /*
 * Author: Biren Patel
-* Description: Doubly linked list API
+* Description: Generic doubly linked list API via void pointers
 */
 
 #ifndef DLL_H
@@ -8,12 +8,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
-/*******************************************************************************
-* purpose: user-modifiable hyperparameters
-* @ dll_item : the datum stored in each node, set to void* for a generic list
-*******************************************************************************/
-typedef void* dll_item;
 
 /*******************************************************************************
 * struct: dll_node
@@ -26,13 +20,13 @@ struct dll_node
 {
     struct dll_node *prev;
     struct dll_node *next;
-    dll_item datum;
+    void *datum;
 };
 
 /*******************************************************************************
 * struct: dll
 * purpose: client must declare pointer to this list structure to access the API
-* @ destroy : pointer to function for dll_item destruction, else NULL
+* @ destroy : pointer to function for void * destruction, else NULL
 * @ head : pointer to the first node in the list
 * @ tail : pointer to the final node in the list
 * @ size : the total number of nodes in the list
@@ -57,7 +51,7 @@ struct dll
 /*******************************************************************************
 * public function: dll_create
 * purpose: constructor
-* @ destroy : pointer to function for dll_item destruction, else NULL
+* @ destroy : pointer to function for void * destruction, else NULL
 * returns: pointer to struct dll
 *******************************************************************************/
 struct dll *dll_create(void (*destroy)(void *data));
@@ -79,7 +73,7 @@ void dll_destroy(struct dll *list);
 * @ datum : the piece of data to store in the new node
 * returns: pointer to the new node if successful, else NULL
 *******************************************************************************/
-struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum);
+struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum);
 
 /*******************************************************************************
 * public function: dll_remove_pos
@@ -88,16 +82,16 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, dll_item datum);
 * @ pos : position of removal, equal to size of list - 1 for tail removal
 * returns: datum stored at removed node 
 *******************************************************************************/
-dll_item dll_remove_pos(struct dll *list, uint32_t pos);
+void *dll_remove_pos(struct dll *list, uint32_t pos);
 
 /*******************************************************************************
 * public function: dll_access_pos
 * purpose: peek data in node at specified position
 * @ list : pointer to struct dll
 * @ pos : position of access, equal to size of list - 1 for tail peek
-* returns : item at node, of type dll_item.
+* returns : item at node, of type void *.
 *******************************************************************************/
-dll_item dll_access_pos(struct dll *list, uint32_t pos);
+void *dll_access_pos(struct dll *list, uint32_t pos);
 
 //nodal functions
 
@@ -114,7 +108,7 @@ struct dll_node *dll_insert_node
 (
     struct dll *list, 
     struct dll_node *node, 
-    dll_item datum,
+    void *datum,
     char method
 );
 
@@ -125,7 +119,7 @@ struct dll_node *dll_insert_node
 * @ node : pointer to node requiring removal
 * returns: datum stored at removed node
 *******************************************************************************/
-dll_item dll_remove_node(struct dll *list, struct dll_node *node);
+void *dll_remove_node(struct dll *list, struct dll_node *node);
 
 //utilities
 
@@ -147,7 +141,7 @@ bool dll_search_node(struct dll *list, struct dll_node *node, char method);
 * @ method : 1 to begin search at head, 2 to begin at tail.
 * returns: the first dll_node containing the data, null if not found
 *******************************************************************************/
-struct dll_node *dll_search(struct dll *list, dll_item datum, char method);
+struct dll_node *dll_search(struct dll *list, void *datum, char method);
 
 /*******************************************************************************
 * public function: dll_concat

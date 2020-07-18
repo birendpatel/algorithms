@@ -197,7 +197,7 @@ void test_removal_at_head_of_non_empty_list(void)
     dll_push_head(list, "A");
     
     //when a removal at the head is performed
-    dll_item SUT = dll_pop_head(list);
+    void *SUT = dll_pop_head(list);
     
     //then it is successful
     TEST_ASSERT_EQUAL_STRING("A", SUT);
@@ -220,7 +220,7 @@ void test_removal_at_tail_of_non_empty_list(void)
     dll_push_head(list, "A");
     
     //when a removal at the tail is performed
-    dll_item SUT = dll_pop_tail(list);
+    void *SUT = dll_pop_tail(list);
     
     //then it is successful
     TEST_ASSERT_EQUAL_STRING("E", SUT);
@@ -243,7 +243,7 @@ void test_removal_in_middle_of_list_does_not_break_list_links(void)
     dll_push_head(list, "A");
     
     //when a removal at the middle is performed
-    dll_item SUT = dll_remove_pos(list, 2);
+    void *SUT = dll_remove_pos(list, 2);
     
     //then it is successful in retaining all forward and backward links
     TEST_ASSERT_EQUAL_STRING("C", SUT);
@@ -268,7 +268,7 @@ void test_access_in_middle_of_list(void)
     dll_push_head(list, "A");
     
     //when an access attempt at the middle is performed
-    dll_item SUT = dll_access_pos(list, 2);
+    void *SUT = dll_access_pos(list, 2);
     
     //then it is successful without causing a removal
     TEST_ASSERT_EQUAL_STRING("C", SUT);
@@ -359,7 +359,7 @@ void test_removal_of_first_new_node_after_concatenation(void)
     dll_push_head(list_2, "D");
     
     //when the first new node after a concatenation is removed
-    dll_item SUT = dll_remove_node(list_1, dll_concat(list_1, list_2));
+    void *SUT = dll_remove_node(list_1, dll_concat(list_1, list_2));
     
     //then it does not disrupt concatenation
     TEST_ASSERT_EQUAL_STRING("D", SUT);
