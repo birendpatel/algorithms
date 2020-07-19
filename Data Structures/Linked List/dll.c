@@ -399,7 +399,7 @@ struct dll_node *dll_copy(struct dll *A, struct dll *B)
     assert(B != NULL && "input list pointer B is null");
     assert(B->size != 0 && "nothing to concatenate");
     
-    struct dll_node *ret_node;
+    struct dll_node *ret_node = NULL;
     struct dll_node *old_tail = A->tail;
     
     //walk list B and copy node data to list A one by one    
