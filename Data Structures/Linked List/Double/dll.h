@@ -43,7 +43,7 @@ struct dll
     void (*destroy)(void *data);
     struct dll_node *head;
     struct dll_node *tail;
-    uint32_t size;
+    size_t size;
 };
 
 //constructors
@@ -73,7 +73,7 @@ void dll_destroy(struct dll *list);
 * @ datum : the piece of data to store in the new node
 * returns: pointer to the new node if successful, else NULL
 *******************************************************************************/
-struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum);
+struct dll_node *dll_insert_pos(struct dll *list, size_t pos, void *datum);
 
 /*******************************************************************************
 * public function: dll_remove_pos
@@ -82,7 +82,7 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum);
 * @ pos : position of removal, equal to size of list - 1 for tail removal
 * returns: datum stored at removed node 
 *******************************************************************************/
-void *dll_remove_pos(struct dll *list, uint32_t pos);
+void *dll_remove_pos(struct dll *list, size_t pos);
 
 /*******************************************************************************
 * public function: dll_access_pos
@@ -91,7 +91,7 @@ void *dll_remove_pos(struct dll *list, uint32_t pos);
 * @ pos : position of access, equal to size of list - 1 for tail peek
 * returns : item at node, of type void *.
 *******************************************************************************/
-void *dll_access_pos(struct dll *list, uint32_t pos);
+void *dll_access_pos(struct dll *list, size_t pos);
 
 //nodal functions
 

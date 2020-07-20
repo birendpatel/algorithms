@@ -45,7 +45,7 @@ void dll_destroy(struct dll *list)
 
 /******************************************************************************/
 
-struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum)
+struct dll_node *dll_insert_pos(struct dll *list, size_t pos, void *datum)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos <= list->size && "position out of bounds");
@@ -97,7 +97,7 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum)
             struct dll_node *curr = list->head->next;
             
             //walk the list to find the node to be shifted
-            for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
+            for (size_t i = 1; i < pos; ++i) curr = curr->next;
             assert(curr != NULL && "walked off end of list");
             
             //insert new node at this location, first update new node
@@ -122,7 +122,7 @@ struct dll_node *dll_insert_pos(struct dll *list, uint32_t pos, void *datum)
 
 /******************************************************************************/
 
-void *dll_remove_pos(struct dll *list, uint32_t pos)
+void *dll_remove_pos(struct dll *list, size_t pos)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos < list->size && "position out of bounds");
@@ -156,7 +156,7 @@ void *dll_remove_pos(struct dll *list, uint32_t pos)
         struct dll_node *curr = list->head->next;
         
         //walk the list to find the node to be removed
-        for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
+        for (size_t i = 1; i < pos; ++i) curr = curr->next;
         assert(curr != list->tail->next && "walked off end of list");
         removed_node = curr;
         
@@ -177,7 +177,7 @@ void *dll_remove_pos(struct dll *list, uint32_t pos)
 
 /******************************************************************************/
 
-void *dll_access_pos(struct dll *list, uint32_t pos)
+void *dll_access_pos(struct dll *list, size_t pos)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos < list->size && "position out of bounds");
@@ -194,7 +194,7 @@ void *dll_access_pos(struct dll *list, uint32_t pos)
     {
         struct dll_node *curr = list->head->next;
         
-        for (uint32_t i = 1; i < pos; ++i) curr = curr->next;
+        for (size_t i = 1; i < pos; ++i) curr = curr->next;
         
         return curr->datum;
     }
@@ -211,53 +211,67 @@ struct dll_node *dll_insert_node
 )
 {
     assert(list != NULL && "input list pointer is null");
-    assert((node == NULL || dll_search_node(list, node, 1)) && "no node");
-    assert(!(node == NULL && list->size != 0) && "null node on non empty list");
     assert((method == 1 || method == 2) && "invalid method");
     
+    //allocate memory for a new node
     struct dll_node *new_node = malloc(sizeof(struct dll_node));
     if (new_node == NULL) return NULL;
     
+    //place data in the new node
+    new_node->datum = datum;
+    
     if (list->size == 0)
     {
-        //insert into empty list
         new_node->prev = NULL;
         new_node->next = NULL;
-        
         list->head = new_node;
         list->tail = new_node;
-        
     }
     else
     {
-        if (method == 1)
+        switch(method)
         {
-            //insert after the input node
-            new_node->prev = node;
-            new_node->next = node->next;
-            node->next = new_node;
-            
-            if (new_node->next == NULL) list->tail = new_node;
-            else new_node->next->prev = new_node;
-        }
-        else if (method == 2)
-        {
-            //insert before the input node
-            new_node->prev = node->prev;
-            new_node->next = node;
-            node->prev = new_node;
-            
-            if (new_node->prev == NULL) list->head = new_node;
-            else new_node->prev->next = new_node;
+            case 1: if (node == NULL || node == list->tail)
+                    {
+                        //insert at tail
+                        new_node->prev = list->tail;
+                        new_node->next = NULL;
+                        list->tail->next = new_node;
+                        list->tail = new_node;
+                    }
+                    else
+                    {
+                        //insert in middle after the input node
+                        new_node->prev = node;
+                        new_node->next = node->next;
+                        node->next = new_node;
+                        new_node->next->prev = new_node;
+                    }
+                    
+                    break;
+                    
+            case 2: if (node == NULL || node == list->head)
+                    {
+                        //insert at head
+                        new_node->prev = NULL;
+                        new_node->next = list->head;
+                        list->head->prev = new_node;
+                        list->head = new_node;
+                    }
+                    else
+                    {
+                        //insert in middle before the input node
+                        new_node->prev = node->prev;
+                        new_node->next = node;
+                        node->prev = new_node;
+                        new_node->prev->next = new_node;
+                    }
+                    
+                    break;
         }
     }
     
-    //place data in new node
-    new_node->datum = datum;
-    
-    //update metadata
     ++list->size;
-    
     return new_node;
 }
 
