@@ -11,16 +11,16 @@
 
 /*******************************************************************************
 * struct: dll_node
-* purpose: list node 
+* purpose: list node
 * @ prev : pointer to the previous node, NULL if at head node
 * @ next : pointer to the next node, NULL if at tail node
-* @ datum : the piece of data stored in each node
+* @ data : the piece of data stored in each node
 *******************************************************************************/
 struct dll_node
 {
     struct dll_node *prev;
     struct dll_node *next;
-    void *datum;
+    void *data;
 };
 
 /*******************************************************************************
@@ -70,17 +70,17 @@ void dll_destroy(struct dll *list);
 * purpose: insert a new node at the specified position
 * @ list : pointer to struct dll
 * @ pos : position of insertion, equal to size of list for tail entry
-* @ datum : the piece of data to store in the new node
+* @ data : the piece of data to store in the new node
 * returns: pointer to the new node if successful, else NULL
 *******************************************************************************/
-struct dll_node *dll_insert_pos(struct dll *list, size_t pos, void *datum);
+struct dll_node *dll_insert_pos(struct dll *list, size_t pos, void *data);
 
 /*******************************************************************************
 * public function: dll_remove_pos
 * purpose: remove a node at the specified position
 * @ list : pointer to struct dll
 * @ pos : position of removal, equal to size of list - 1 for tail removal
-* returns: datum stored at removed node 
+* returns: data stored at removed node
 *******************************************************************************/
 void *dll_remove_pos(struct dll *list, size_t pos);
 
@@ -100,15 +100,15 @@ void *dll_access_pos(struct dll *list, size_t pos);
 * purpose: insert a node after or before the input node
 * @ list : pointer to struct dll
 * @ node : pointer to node after or before which to insert
-* @ datum : the piece of data stored at the new node
+* @ data : the piece of data stored at the new node
 * @ method : 1 for insert after, 2 for insert before
 * returns : pointer to the new node if successful, else NULL
 *******************************************************************************/
 struct dll_node *dll_insert_node
 (
-    struct dll *list, 
-    struct dll_node *node, 
-    void *datum,
+    struct dll *list,
+    struct dll_node *node,
+    void *data,
     char method
 );
 
@@ -116,10 +116,11 @@ struct dll_node *dll_insert_node
 * public function: dll_remove_node
 * purpose: remove the input node
 * @ list : pointer to struct dll
-* @ node : pointer to node requiring removal
-* returns: datum stored at removed node
+* @ node : pointer to node requiring removal, NULL only if method is 1 or 2
+* @ method : removal position, 0 if removing at middle, 1 if tail, 2 if head
+* returns: data stored at removed node
 *******************************************************************************/
-void *dll_remove_node(struct dll *list, struct dll_node *node);
+void *dll_remove_node(struct dll *list, struct dll_node *node, char method);
 
 //utilities
 
@@ -137,11 +138,11 @@ bool dll_search_node(struct dll *list, struct dll_node *node, char method);
 * public function: dll_search
 * purpose: search for data within the list
 * @ list : pointer to struct dll
-* @ datum : search criterion
+* @ data : search criterion
 * @ method : 1 to begin search at head, 2 to begin at tail.
 * returns: the first dll_node containing the data, null if not found
 *******************************************************************************/
-struct dll_node *dll_search(struct dll *list, void *datum, char method);
+struct dll_node *dll_search(struct dll *list, void *data, char method);
 
 /*******************************************************************************
 * public function: dll_concat
@@ -172,14 +173,15 @@ struct dll_node *dll_copy(struct dll *A, struct dll *B);
 
 /*******************************************************************************
 * macro: push/pop/peek + head/tail
-* purpose: insertion, removal, and access macros for head and tail 
+* purpose: insertion, removal, and access macros for head and tail
 *******************************************************************************/
-#define dll_push_head(list, datum) dll_insert_pos(list, 0, datum)
-#define dll_pop_head(list) dll_remove_pos(list, 0)
-#define dll_peek_head(list) dll_access_pos(list, 0)
+#define dll_push_head(list, data) dll_insert_node(list, NULL, data, 2)
+#define dll_push_tail(list, data) dll_insert_node(list, NULL, data, 1)
 
-#define dll_push_tail(list, datum) dll_insert_pos(list, list->size, datum)
-#define dll_pop_tail(list) dll_remove_pos(list, list->size - 1)
+#define dll_pop_head(list) dll_remove_node(list, NULL, 2)
+#define dll_pop_tail(list) dll_remove_node(list, NULL, 1)
+
+#define dll_peek_head(list) dll_access_pos(list, 0)
 #define dll_peek_tail(list) dll_access_pos(list, list->size - 1)
 
 #endif
