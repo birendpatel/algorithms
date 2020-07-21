@@ -10,43 +10,6 @@
 #include "dll.h"
 
 /*******************************************************************************
-* struct: dll_node
-* purpose: list node
-* @ prev : pointer to the previous node, NULL if at head node
-* @ next : pointer to the next node, NULL if at tail node
-* @ data : the piece of data stored in each node
-*******************************************************************************/
-struct dll_node
-{
-    struct dll_node *prev;
-    struct dll_node *next;
-    void *data;
-};
-
-/*******************************************************************************
-* struct: dll
-* purpose: client must declare pointer to this list structure to access the API
-* @ destroy : pointer to function for void * destruction, else NULL
-* @ head : pointer to the first node in the list
-* @ tail : pointer to the final node in the list
-* @ size : the total number of nodes in the list
-*
-
-          #======#  ---->  #======#  ---->  #======#  ---->  #======#
-  X <---- # head #         # node #         # node #         # tail # ----> X
-          #======#  <----  #======#  ---->  #======#  <----  #======#
-
-
-*******************************************************************************/
-struct dll
-{
-    void (*destroy)(void *data);
-    struct dll_node *head;
-    struct dll_node *tail;
-    int size;
-};
-
-/*******************************************************************************
 * public functions
 *******************************************************************************/
 

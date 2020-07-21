@@ -12,17 +12,33 @@
 * struct: dll_node
 * purpose: list node returned on some functions, can be used as later input to
 * nodal functions for O(1) operations.
+* @ prev : pointer to the previous node, NULL if at head node
+* @ next : pointer to the next node, NULL if at tail node
+* @ data : the piece of data stored in each node
 *******************************************************************************/
-struct dll_node;
-typedef struct dll_node *Node;
+typedef struct dll_node
+{
+    struct dll_node *prev;
+    struct dll_node *next;
+    void *data;
+} *Node;
 
 /*******************************************************************************
 * struct: dll
 * purpose: The list itself, composed of nodes and metadata. The client should
 * first declare a pointer to this list structure in order to access the API.
+* @ destroy : pointer to function for void * destruction, else NULL
+* @ head : pointer to the first node in the list
+* @ tail : pointer to the final node in the list
+* @ size : the total number of nodes in the list
 *******************************************************************************/
-struct dll;
-typedef struct dll *List;
+typedef struct dll
+{
+    void (*destroy)(void *data);
+    struct dll_node *head;
+    struct dll_node *tail;
+    int size;
+} *List;
 
 //constructors
 
