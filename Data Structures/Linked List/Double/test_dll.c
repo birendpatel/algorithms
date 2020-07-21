@@ -155,7 +155,7 @@ void test_forward_pass_from_head_to_tail_is_not_broken(void)
 
     //then it is successful
     TEST_ASSERT_NOT_NULL(SUT);
-    TEST_ASSERT_EQUAL_STRING("E", SUT->data);
+    TEST_ASSERT_EQUAL_STRING("E", dll_peek_tail(list));
 
     //afterwards clean up memory
     dll_destroy(list);
@@ -178,7 +178,7 @@ void test_backward_pass_from_tail_to_head_is_not_broken(void)
 
     //then it is successful
     TEST_ASSERT_NOT_NULL(SUT);
-    TEST_ASSERT_EQUAL_STRING("A", SUT->data);
+    TEST_ASSERT_EQUAL_STRING("A", dll_peek_head(list));
 
     //afterwards clean up memory
     dll_destroy(list);
@@ -296,11 +296,11 @@ void test_concat_two_lists_is_successful(void)
     dll_push_head(list_2, "D");
 
     //when list 2 is concatenated to list 1
-    struct dll_node *new_node = dll_concat(list_1, list_2);
+    dll_concat(list_1, list_2);
     dll_destroy(list_2);
 
     //then it is successful
-    TEST_ASSERT_EQUAL_STRING("D", new_node->data);
+    TEST_ASSERT_EQUAL_STRING("D", dll_access_pos(list_1, 3));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
     TEST_ASSERT_EQUAL_INT(6, dll_size(list_1));
@@ -327,10 +327,10 @@ void test_deep_copy_two_lists_is_successful(void)
     dll_push_head(list_2, "D");
 
     //when a copy of list 2 is performed
-    struct dll_node *new_node = dll_copy(list_1, list_2);
+    dll_copy(list_1, list_2);
 
     //then it is successful
-    TEST_ASSERT_EQUAL_STRING("D", new_node->data);
+    TEST_ASSERT_EQUAL_STRING("D", dll_access_pos(list_1, 3));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
     TEST_ASSERT_EQUAL_INT(6, dll_size(list_1));
@@ -390,10 +390,10 @@ void test_insert_node_before_first_new_node_after_concat(void)
 
     //when a new node is inserted before first new node after concatenation
     struct dll_node *first_new_node = dll_concat(list_1, list_2);
-    struct dll_node *SUT = dll_insert_node(list_1, first_new_node, "Z", 2);
+    dll_insert_node(list_1, first_new_node, "Z", 2);
 
     //then it is successful
-    TEST_ASSERT_EQUAL_STRING("Z", SUT->data);
+    TEST_ASSERT_EQUAL_STRING("Z", dll_access_pos(list_1, 3));
     TEST_ASSERT_EQUAL_INT(7, dll_size(list_1));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
@@ -419,12 +419,12 @@ void test_insert_node_after_first_new_node_after_concat(void)
     dll_push_head(list_2, "E");
     dll_push_head(list_2, "D");
 
-    //when a new node is inserted before first new node after concatenation
+    //when a new node is inserted after first new node after concatenation
     struct dll_node *first_new_node = dll_concat(list_1, list_2);
-    struct dll_node *SUT = dll_insert_node(list_1, first_new_node, "Z", 1);
+    dll_insert_node(list_1, first_new_node, "Z", 1);
 
     //then it is successful
-    TEST_ASSERT_EQUAL_STRING("Z", SUT->data);
+    TEST_ASSERT_EQUAL_STRING("Z", dll_access_pos(list_1, 4));
     TEST_ASSERT_EQUAL_INT(7, dll_size(list_1));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "F", 1));
     TEST_ASSERT_NOT_NULL(dll_search(list_1, "A", 2));
@@ -432,6 +432,24 @@ void test_insert_node_after_first_new_node_after_concat(void)
     //afterwards clean up memory
     dll_destroy(list_1);
     dll_destroy(list_2);
+}
+
+/******************************************************************************/
+
+void test_typedef_lists_and_nodes_are_accepted(void)
+{
+    //given a list typedef'd
+    List list = dll_create(NULL);
+    Node head = dll_push_head(list, "A");
+    
+    //when a typedef'd node is inserted
+    dll_insert_node(list, head, "B", 1);
+    
+    //then it is successful
+    TEST_ASSERT_EQUAL_STRING("B", dll_peek_tail(list));
+    
+    //afterwards clean up memory
+    dll_destroy(list);
 }
 
 /******************************************************************************/
@@ -498,6 +516,7 @@ int main(void)
         RUN_TEST(test_removal_of_first_new_node_after_concatenation);
         RUN_TEST(test_insert_node_before_first_new_node_after_concat);
         RUN_TEST(test_insert_node_after_first_new_node_after_concat);
+        RUN_TEST(test_typedef_lists_and_nodes_are_accepted);
     UNITY_END();
 
     INTEGRATION_BEGIN();

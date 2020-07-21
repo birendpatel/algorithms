@@ -6,45 +6,23 @@
 #ifndef DLL_H
 #define DLL_H
 
-#include <stdint.h>
 #include <stdbool.h>
 
 /*******************************************************************************
 * struct: dll_node
-* purpose: list node
-* @ prev : pointer to the previous node, NULL if at head node
-* @ next : pointer to the next node, NULL if at tail node
-* @ data : the piece of data stored in each node
+* purpose: list node returned on some functions, can be used as later input to
+* nodal functions for O(1) operations.
 *******************************************************************************/
-struct dll_node
-{
-    struct dll_node *prev;
-    struct dll_node *next;
-    void *data;
-};
+struct dll_node;
+typedef struct dll_node *Node;
 
 /*******************************************************************************
 * struct: dll
-* purpose: client must declare pointer to this list structure to access the API
-* @ destroy : pointer to function for void * destruction, else NULL
-* @ head : pointer to the first node in the list
-* @ tail : pointer to the final node in the list
-* @ size : the total number of nodes in the list
-*
-
-          #======#  ---->  #======#  ---->  #======#  ---->  #======#
-  X <---- # head #         # node #         # node #         # tail # ----> X
-          #======#  <----  #======#  ---->  #======#  <----  #======#
-
-
+* purpose: The list itself, composed of nodes and metadata. The client should
+* first declare a pointer to this list structure in order to access the API.
 *******************************************************************************/
-struct dll
-{
-    void (*destroy)(void *data);
-    struct dll_node *head;
-    struct dll_node *tail;
-    size_t size;
-};
+struct dll;
+typedef struct dll *List;
 
 //constructors
 
@@ -73,7 +51,7 @@ void dll_destroy(struct dll *list);
 * @ data : the piece of data to store in the new node
 * returns: pointer to the new node if successful, else NULL
 *******************************************************************************/
-struct dll_node *dll_insert_pos(struct dll *list, size_t pos, void *data);
+struct dll_node *dll_insert_pos(struct dll *list, int pos, void *data);
 
 /*******************************************************************************
 * public function: dll_remove_pos
@@ -82,16 +60,16 @@ struct dll_node *dll_insert_pos(struct dll *list, size_t pos, void *data);
 * @ pos : position of removal, equal to size of list - 1 for tail removal
 * returns: data stored at removed node
 *******************************************************************************/
-void *dll_remove_pos(struct dll *list, size_t pos);
+void *dll_remove_pos(struct dll *list, int pos);
 
 /*******************************************************************************
 * public function: dll_access_pos
 * purpose: peek data in node at specified position
 * @ list : pointer to struct dll
-* @ pos : position of access, equal to size of list - 1 for tail peek
+* @ pos : position of access, with negative indexing available
 * returns : item at node, of type void *.
 *******************************************************************************/
-void *dll_access_pos(struct dll *list, size_t pos);
+void *dll_access_pos(struct dll *list, int pos);
 
 //nodal functions
 
@@ -163,13 +141,13 @@ struct dll_node *dll_concat(struct dll *A, struct dll *B);
 *******************************************************************************/
 struct dll_node *dll_copy(struct dll *A, struct dll *B);
 
-//macros
-
 /*******************************************************************************
-* macro: dll_size
-* purpose: return total number of nodes currently in list
+* public function: dll_size
+* purpose: size of list
+* @ list : point to struct dll
+* returns: int number of nodes
 *******************************************************************************/
-#define dll_size(list) list->size
+int dll_size(struct dll *list);
 
 /*******************************************************************************
 * macro: push/pop/peek + head/tail
@@ -182,6 +160,6 @@ struct dll_node *dll_copy(struct dll *A, struct dll *B);
 #define dll_pop_tail(list) dll_remove_node(list, NULL, 1)
 
 #define dll_peek_head(list) dll_access_pos(list, 0)
-#define dll_peek_tail(list) dll_access_pos(list, list->size - 1)
+#define dll_peek_tail(list) dll_access_pos(list, -1)
 
 #endif
