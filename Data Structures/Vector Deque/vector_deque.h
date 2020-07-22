@@ -32,9 +32,8 @@ typedef struct name##_                                                         \
     uint64_t L_idx;                                                            \
     uint64_t R_idx;                                                            \
     type vector[];                                                             \
-} * name;
+} * name;                                                                      \
         
-
 /*******************************************************************************
 * macro: vector_declarations
 * purpose: prototypes
@@ -45,7 +44,6 @@ typedef struct name##_                                                         \
 scope name name##_create (uint64_t n, uint64_t offset);                        \
 scope void name##_destroy (name vector);                                       \
 scope bool name##_push_back (name vec, type item);                             \
-
 
 /*******************************************************************************
 * function: name##_create
@@ -84,7 +82,6 @@ scope void name##_destroy (name vec)                                           \
     free(vec);                                                                 \
 }                                                                              \
 
-
 /*******************************************************************************
 * function: name##_push_back
 * purpose: push an element to the back of the vector
@@ -104,8 +101,32 @@ scope bool name##_push_back (name vec, type item)                              \
         return false;                                                          \
     }                                                                          \
                                                                                \
-    vec->vector[vec->R_idx] = item;                                            \
-    ++vec->R_idx;                                                              \
+    vec->vector[vec->R_idx++] = item;                                          \
+    ++vec->count;                                                              \
+                                                                               \
+    return true;                                                               \
+}                                                                              \
+
+/*******************************************************************************
+* name##_push_front
+* purpose: push an element to the front of the vector
+* @ vec: variable of type struct name__
+* @ item : variable of macro param type
+* returns: true if successful, false on failure
+*******************************************************************************/
+
+#define vector_definition_push_front(scope, name, type)                        \
+                                                                               \
+scope bool name##_push_front(name vec, type item)                              \
+{                                                                              \
+    assert(vec != NULL && "input vector is null");                             \
+                                                                               \
+    if (vec->L_idx == 0)                                                       \
+    {                                                                          \
+        return false;                                                          \
+    }                                                                          \
+                                                                               \
+    vec->vector[--vec->L_idx] = item;                                          \
     ++vec->count;                                                              \
                                                                                \
     return true;                                                               \
@@ -113,7 +134,8 @@ scope bool name##_push_back (name vec, type item)                              \
 
 /*******************************************************************************
 * macro: make_vector
-* purpose: general purpose wrapper over the three definitions for easy API use
+* purpose: general purpose wrapper over all other macros for easy API use
+* note: the void-void prototype pollutes the namespace but allows a semicolon
 *******************************************************************************/
 
 #define make_vector(name, type, scope)                                         \
@@ -123,6 +145,7 @@ vector_declarations(scope, name, type)                                         \
 vector_definition_create(scope, name, type)                                    \
 vector_definition_destroy(scope, name, type)                                   \
 vector_defintion_push_back(scope, name, type)                                  \
+vector_definition_push_front(scope, name, type)                                \
 void name##_vector_deque(void)                                                 \
         
 #endif

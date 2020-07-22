@@ -25,16 +25,21 @@ void tearDown(void) {}
         status == 1 ? "OK        " : "FAIL      ");
 
 /******************************************************************************/
+//systems under test with various data types
 
-make_vector(SUT, int, static inline);
+make_vector(int_sut, int, static inline);
+
+make_vector(str_sut, char*, static inline);
+
+/******************************************************************************/
 
 void test_push_back_on_empty_vector(void)
 {
     //given an empty vector
-    SUT x = SUT_create(100, 0);
+    int_sut x = int_sut_create(100, 0);
     
     //when we push an element to the back
-    bool status = SUT_push_back(x, 42);
+    bool status = int_sut_push_back(x, 42);
     
     //then it is successful
     TEST_ASSERT_TRUE(status);
@@ -42,7 +47,7 @@ void test_push_back_on_empty_vector(void)
     TEST_ASSERT_EQUAL_INT(1, x->count);
     
     //afterwards clean up memory
-    SUT_destroy(x);
+    int_sut_destroy(x);
 }
 
 /******************************************************************************/
@@ -50,10 +55,10 @@ void test_push_back_on_empty_vector(void)
 void test_push_back_on_empty_vector_with_offset(void)
 {
     //given an empty vector with an offset from the start of its array member
-    SUT x = SUT_create(100, 50);
+    int_sut x = int_sut_create(100, 50);
     
     //when we push an element to the back
-    bool status = SUT_push_back(x, 42);
+    bool status = int_sut_push_back(x, 42);
     
     //then it is successful
     TEST_ASSERT_TRUE(status);
@@ -62,7 +67,49 @@ void test_push_back_on_empty_vector_with_offset(void)
     TEST_ASSERT_EQUAL_INT(1, x->count);
     
     //afterwards clean up memory
-    SUT_destroy(x);
+    int_sut_destroy(x);
+}
+
+/******************************************************************************/
+
+void test_push_front_on_empty_vector_with_offset(void)
+{
+    //given an empty vector with an offset from the start of its array member
+    int_sut x = int_sut_create(100, 50);
+    
+    //when we push an element to the front
+    bool status = int_sut_push_front(x, 42);
+    
+    //then it is successful
+    TEST_ASSERT_TRUE(status);
+    TEST_ASSERT_EQUAL_INT(42, x->vector[x->L_idx]);
+    TEST_ASSERT_EQUAL_INT(42, x->vector[49]);
+    TEST_ASSERT_EQUAL_INT(1, x->count);
+    
+    //afterwards clean up memory
+    int_sut_destroy(x);
+}
+
+/******************************************************************************/
+
+void test_push_back_and_front_on_empty_vector_with_offset(void)
+{
+    //given an empty vector with an offset from the start of its array member
+    str_sut x = str_sut_create(100, 1);
+    
+    //when we push an element to the back and then to the front
+    bool status_push_back = str_sut_push_back(x, "B");
+    bool status_push_front = str_sut_push_front(x, "A");
+    
+    //then it is successful
+    TEST_ASSERT_TRUE(status_push_back);
+    TEST_ASSERT_TRUE(status_push_front);
+    TEST_ASSERT_EQUAL_STRING("A", x->vector[0]);
+    TEST_ASSERT_EQUAL_STRING("B", x->vector[1]);
+    TEST_ASSERT_EQUAL_INT(2, x->count);
+
+    //afterwards clean up memory
+    str_sut_destroy(x);
 }
 
 /******************************************************************************/
@@ -72,6 +119,8 @@ int main(void)
     UNITY_BEGIN();
         RUN_TEST(test_push_back_on_empty_vector);
         RUN_TEST(test_push_back_on_empty_vector_with_offset);
+        RUN_TEST(test_push_front_on_empty_vector_with_offset);
+        RUN_TEST(test_push_back_and_front_on_empty_vector_with_offset);
     UNITY_END();
     
     return EXIT_SUCCESS;
