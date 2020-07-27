@@ -27,6 +27,14 @@ void tearDown(void) {}
         status == 1 ? "OK        " : "FAIL      ");
 
 /******************************************************************************/
+//string comparison function for search functions
+
+int strcmp_local(const void *a, const void *b)
+{
+    return strcmp((const char*) a, (const char*) b);
+}
+
+/******************************************************************************/
 
 void test_insert_at_head_of_empty_list(void)
 {
@@ -152,7 +160,7 @@ void test_forward_pass_from_head_to_tail_is_not_broken(void)
     list_push_head(list, "A");
 
     //when a forward pass is attempted
-    struct list_node *SUT = list_search(list, "E", 1, strcmp);
+    struct list_node *SUT = list_search(list, "E", 1, strcmp_local);
 
     //then it is successful
     TEST_ASSERT_NOT_NULL(SUT);
@@ -175,7 +183,7 @@ void test_backward_pass_from_tail_to_head_is_not_broken(void)
     list_push_head(list, "A");
 
     //when a backward pass is attempted
-    struct list_node *SUT = list_search(list, "A", 2, strcmp);
+    struct list_node *SUT = list_search(list, "A", 2, strcmp_local);
 
     //then it is successful
     TEST_ASSERT_NOT_NULL(SUT);
@@ -248,8 +256,8 @@ void test_removal_in_middle_of_list_does_not_break_list_links(void)
 
     //then it is successful in retaining all forward and backward links
     TEST_ASSERT_EQUAL_STRING("C", SUT);
-    TEST_ASSERT_NOT_NULL(list_search(list, "E", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list, "A", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list, "E", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list, "A", 2, strcmp_local));
 
     //afterwards clean up memory
     list_destroy(list);
@@ -273,7 +281,7 @@ void test_access_in_middle_of_list(void)
 
     //then it is successful without causing a removal
     TEST_ASSERT_EQUAL_STRING("C", SUT);
-    TEST_ASSERT_NOT_NULL(list_search(list, "C", 1, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list, "C", 1, strcmp_local));
     TEST_ASSERT_EQUAL_INT(5, list_size(list));
 
     //afterwards clean up memory
@@ -302,8 +310,8 @@ void test_concat_two_lists_is_successful(void)
 
     //then it is successful
     TEST_ASSERT_EQUAL_STRING("D", list_access_pos(list_1, 3));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp_local));
     TEST_ASSERT_EQUAL_INT(6, list_size(list_1));
 
     //afterwards clean up memory
@@ -332,11 +340,11 @@ void test_deep_copy_two_lists_is_successful(void)
 
     //then it is successful
     TEST_ASSERT_EQUAL_STRING("D", list_access_pos(list_1, 3));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp_local));
     TEST_ASSERT_EQUAL_INT(6, list_size(list_1));
-    TEST_ASSERT_NOT_NULL(list_search(list_2, "F", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list_2, "D", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list_2, "F", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list_2, "D", 2, strcmp_local));
 
     //afterwards clean up memory
     list_destroy(list_1);
@@ -365,8 +373,8 @@ void test_removal_of_first_new_node_after_concatenation(void)
     //then it does not disrupt concatenation
     TEST_ASSERT_EQUAL_STRING("D", SUT);
     TEST_ASSERT_EQUAL_INT(5, list_size(list_1));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp_local));
 
     //afterwards clean up memory
     list_destroy(list_1);
@@ -396,8 +404,8 @@ void test_insert_node_before_first_new_node_after_concat(void)
     //then it is successful
     TEST_ASSERT_EQUAL_STRING("Z", list_access_pos(list_1, 3));
     TEST_ASSERT_EQUAL_INT(7, list_size(list_1));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp_local));
 
     //afterwards clean up memory
     list_destroy(list_1);
@@ -427,8 +435,8 @@ void test_insert_node_after_first_new_node_after_concat(void)
     //then it is successful
     TEST_ASSERT_EQUAL_STRING("Z", list_access_pos(list_1, 4));
     TEST_ASSERT_EQUAL_INT(7, list_size(list_1));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp));
-    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "F", 1, strcmp_local));
+    TEST_ASSERT_NOT_NULL(list_search(list_1, "A", 2, strcmp_local));
 
     //afterwards clean up memory
     list_destroy(list_1);

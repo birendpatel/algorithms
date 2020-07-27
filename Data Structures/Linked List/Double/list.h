@@ -133,7 +133,7 @@ bool list_search_node
     struct list *list,
     struct list_node *node,
     char method,
-    int (*cmp)()
+    int (*cmp)(const void *item_1, const void *item_2)
 );
 
 /*******************************************************************************
@@ -151,7 +151,7 @@ struct list_node *list_search
     struct list *list,
     void *data,
     char method,
-    int (*cmp)()
+    int (*cmp)(const void *item_1, const void *item_2)
 );
 
 /*******************************************************************************
