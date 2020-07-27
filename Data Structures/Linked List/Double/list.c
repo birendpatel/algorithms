@@ -7,15 +7,15 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <limits.h>
-#include "dll.h"
+#include "list.h"
 
 /*******************************************************************************
 * public functions
 *******************************************************************************/
 
-struct dll *dll_create(void (*destroy)(void *data))
+struct list *list_create(void (*destroy)(void *data))
 {
-    struct dll *list = malloc(sizeof(struct dll));
+    struct list *list = malloc(sizeof(struct list));
     if (list == NULL) return NULL;
 
     list->destroy = destroy;
@@ -28,14 +28,14 @@ struct dll *dll_create(void (*destroy)(void *data))
 
 /******************************************************************************/
 
-void dll_destroy(struct dll *list)
+void list_destroy(struct list *list)
 {
     assert(list != NULL && "input list pointer is null");
 
     while (list->head != NULL)
     {
-        if (list->destroy == NULL) dll_pop_head(list);
-        else (*list->destroy)(dll_pop_head(list));
+        if (list->destroy == NULL) list_pop_head(list);
+        else (*list->destroy)(list_pop_head(list));
     }
 
     free(list);
@@ -43,14 +43,14 @@ void dll_destroy(struct dll *list)
 
 /******************************************************************************/
 
-struct dll_node *dll_insert_pos(struct dll *list, int pos, void *data)
+struct list_node *list_insert_pos(struct list *list, int pos, void *data)
 {
     assert(list != NULL && "input list pointer is null");
     assert(list->size < INT_MAX && "list is full");
     assert(pos <= list->size && pos >= 0 && "position out of bounds");
 
     //allocate memory for a new node
-    struct dll_node *new_node = malloc(sizeof(struct dll_node));
+    struct list_node *new_node = malloc(sizeof(struct list_node));
     if (new_node == NULL) return NULL;
 
     //configure pointers in metadata and the new node
@@ -93,7 +93,7 @@ struct dll_node *dll_insert_pos(struct dll *list, int pos, void *data)
         else
         {
             //insert within list starting at the first non-head node
-            struct dll_node *curr = list->head->next;
+            struct list_node *curr = list->head->next;
 
             //walk the list to find the node to be shifted
             for (int i = 1; i < pos; ++i) curr = curr->next;
@@ -121,12 +121,12 @@ struct dll_node *dll_insert_pos(struct dll *list, int pos, void *data)
 
 /******************************************************************************/
 
-void *dll_remove_pos(struct dll *list, int pos)
+void *list_remove_pos(struct list *list, int pos)
 {
     assert(list != NULL && "input list pointer is null");
     assert(pos < list->size && pos >= 0 && "position out of bounds");
 
-    struct dll_node *removed_node;
+    struct list_node *removed_node;
 
     if (pos == 0)
     {
@@ -152,7 +152,7 @@ void *dll_remove_pos(struct dll *list, int pos)
     else
     {
         //remove within list starting at the first non-head node
-        struct dll_node *curr = list->head->next;
+        struct list_node *curr = list->head->next;
 
         //walk the list to find the node to be removed
         for (int i = 1; i < pos; ++i) curr = curr->next;
@@ -176,7 +176,7 @@ void *dll_remove_pos(struct dll *list, int pos)
 
 /******************************************************************************/
 
-void *dll_access_pos(struct dll *list, int pos)
+void *list_access_pos(struct list *list, int pos)
 {   
     assert(list != NULL && "input list pointer is null");
     assert(pos < list->size && pos >= -1 * list->size && "invalid position");
@@ -191,7 +191,7 @@ void *dll_access_pos(struct dll *list, int pos)
     }
     else
     {
-        struct dll_node *curr;
+        struct list_node *curr;
         
         if (pos >= 1)
         {
@@ -210,10 +210,10 @@ void *dll_access_pos(struct dll *list, int pos)
 
 /******************************************************************************/
 
-struct dll_node *dll_insert_node
+struct list_node *list_insert_node
 (
-    struct dll *list,
-    struct dll_node *node,
+    struct list *list,
+    struct list_node *node,
     void *data,
     char method
 )
@@ -221,10 +221,9 @@ struct dll_node *dll_insert_node
     assert(list != NULL && "input list pointer is null");
     assert(list->size < INT_MAX && "list is full");
     assert((method == 1 || method == 2) && "invalid method");
-    assert((node == NULL || dll_search_node(list, node, 1)) && "node DNE");
 
     //allocate memory for a new node
-    struct dll_node *new_node = malloc(sizeof(struct dll_node));
+    struct list_node *new_node = malloc(sizeof(struct list_node));
     if (new_node == NULL) return NULL;
 
     //place data in the new node
@@ -287,14 +286,13 @@ struct dll_node *dll_insert_node
 
 /******************************************************************************/
 
-void *dll_remove_node(struct dll *list, struct dll_node *node, char method)
+void *list_remove_node(struct list *list, struct list_node *node, char method)
 {
     assert(list != NULL && "input list pointer is null");
     assert((method == 0 || method == 1 || method == 2) && "invalid method");
-    assert((node == NULL || dll_search_node(list, node, 1)) && "node DNE");
     assert(!(method == 0 && node == NULL) && "null node on middle removal");
 
-    struct dll_node *del_node;
+    struct list_node *del_node;
     void *ret_data;
 
     switch(method)
@@ -331,26 +329,54 @@ void *dll_remove_node(struct dll *list, struct dll_node *node, char method)
 
 /******************************************************************************/
 
-bool dll_search_node(struct dll *list, struct dll_node *node, char method)
+bool list_search_node
+(
+    struct list *list,
+    struct list_node *node,
+    char method,
+    int (*cmp)()
+)
 {
     assert(list != NULL && "input list pointer is null");
     assert(node != NULL && "input node pointer is null");
     assert((method == 1 || method == 2) && "invalid method type");
     
-    struct dll_node *curr;
+    struct list_node *curr;
 
     switch(method)
     {
         case 1: for (curr = list->head; curr != NULL; curr=curr->next)
                 {
-                    if (curr == node) return true;
+                    if (cmp == NULL)
+                    {
+                        if (curr->prev == node->prev &&
+                            curr->next == node->next &&
+                            curr->data == node->data) return true;
+                    }
+                    else
+                    {
+                        if (curr->prev == node->prev &&
+                            curr->next == node->next &&
+                            (*cmp)(curr->data, node->data)) return true;
+                    }
                 }
 
                 break;
 
         case 2: for (curr = list->tail; curr != NULL; curr=curr->prev)
                 {
-                    if (curr == node) return true;
+                    if (cmp == NULL)
+                    {
+                        if (curr->prev == node->prev &&
+                            curr->next == node->next &&
+                            curr->data == node->data) return true;
+                    }
+                    else
+                    {
+                        if (curr->prev == node->prev &&
+                            curr->next == node->next &&
+                            (*cmp)(curr->data, node->data)) return true;
+                    }
                 }
 
                 break;
@@ -361,25 +387,45 @@ bool dll_search_node(struct dll *list, struct dll_node *node, char method)
 
 /******************************************************************************/
 
-struct dll_node *dll_search(struct dll *list, void *data, char method)
+struct list_node *list_search
+(
+    struct list *list,
+    void *data,
+    char method,
+    int (*cmp)()
+)
 {
     assert(list != NULL && "input list pointer is null");
     assert((method == 1 || method == 2) && "invalid method type");
 
-    struct dll_node *curr = NULL;
+    struct list_node *curr = NULL;
 
     switch(method)
     {
         case 1: for (curr = list->head; curr != NULL; curr=curr->next)
                 {
-                    if (curr->data == data) return curr;
+                    if (cmp == NULL)
+                    {
+                        if (curr->data == data) return curr;
+                    }
+                    else
+                    {
+                        if ((*cmp)(curr->data, data)) return curr;
+                    }
                 }
 
                 break;
 
         case 2: for (curr = list->tail; curr != NULL; curr=curr->prev)
                 {
-                    if (curr->data == data) return curr;
+                    if (cmp == NULL)
+                    {
+                        if (curr->data == data) return curr;
+                    }
+                    else
+                    {
+                        if ((*cmp)(curr->data, data)) return curr;
+                    }
                 }
 
                 break;
@@ -390,7 +436,7 @@ struct dll_node *dll_search(struct dll *list, void *data, char method)
 
 /******************************************************************************/
 
-struct dll_node *dll_concat(struct dll *A, struct dll *B)
+struct list_node *list_concat(struct list *A, struct list *B)
 {
     assert(A != NULL && "input list pointer A is null");
     assert(B != NULL && "input list pointer B is null");
@@ -406,7 +452,7 @@ struct dll_node *dll_concat(struct dll *A, struct dll *B)
     A->size += B->size;
 
     //get ret val
-    struct dll_node *ret_node = B->head;
+    struct list_node *ret_node = B->head;
 
     //make B empty list, user responsibility to destroy if needed
     B->head = NULL;
@@ -418,29 +464,29 @@ struct dll_node *dll_concat(struct dll *A, struct dll *B)
 
 /******************************************************************************/
 
-struct dll_node *dll_copy(struct dll *A, struct dll *B)
+struct list_node *list_copy(struct list *A, struct list *B)
 {
     assert(A != NULL && "input list pointer A is null");
     assert(B != NULL && "input list pointer B is null");
     assert(B->size != 0 && "nothing to concatenate");
 
-    struct dll_node *ret_node = NULL;
-    struct dll_node *old_tail = A->tail;
+    struct list_node *ret_node = NULL;
+    struct list_node *old_tail = A->tail;
 
     //walk list B and copy node data to list A one by one
-    for (struct dll_node *curr = B->head; curr != NULL; curr = curr->next)
+    for (struct list_node *curr = B->head; curr != NULL; curr = curr->next)
     {
-        struct dll_node *push_node = dll_push_tail(A, curr->data);
+        struct list_node *push_node = list_push_tail(A, curr->data);
 
         //malloc failure on push
         if (push_node == NULL)
         {
             //revert list_1 to its state prior to the function call
-            while (dll_peek_tail(A) != old_tail)
+            while (list_peek_tail(A) != old_tail)
             {
                 //use supplied destroy member on constructor if available
-                if (A->destroy == NULL) dll_pop_tail(A);
-                else (*A->destroy)(dll_pop_tail(A));
+                if (A->destroy == NULL) list_pop_tail(A);
+                else (*A->destroy)(list_pop_tail(A));
             }
 
             return NULL;
@@ -455,7 +501,7 @@ struct dll_node *dll_copy(struct dll *A, struct dll *B)
 
 /******************************************************************************/
 
-int dll_size(struct dll *list)
+int list_size(struct list *list)
 {
     assert(list != NULL && "input list pointer is null");
     
