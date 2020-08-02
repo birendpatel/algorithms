@@ -482,7 +482,7 @@ struct list_node *list_copy(struct list *A, struct list *B)
         if (push_node == NULL)
         {
             //revert list_1 to its state prior to the function call
-            while (list_peek_tail(A) != old_tail)
+            while (A->tail != old_tail)
             {
                 //use supplied destroy member on constructor if available
                 if (A->destroy == NULL) list_pop_tail(A);
