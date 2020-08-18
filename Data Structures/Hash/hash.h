@@ -34,11 +34,13 @@ typedef struct hash_table
 
 /******************************************************************************/
 //API
+//duplicate key insertion overrides previous key-value pair
+//LF_threshold triggers dynamic resize on next insertion, set < 0 for 0.7
 
 struct hash_table *htab_create(uint32_t capacity, double LF_threshold);
 void htab_destroy(struct hash_table *ht);
 bool htab_insert(struct hash_table *ht, const char *key, const int64_t value);
-bool htab_search(struct hash_table *ht, char *key, int64_t *value);
+bool htab_search(struct hash_table *ht, const char *key, int64_t *value);
 bool htab_remove(struct hash_table *ht, char *key);
 
 #endif
