@@ -21,11 +21,10 @@ struct node
 };
 
 /******************************************************************************/
-//list heads embedded directly in the table for better cache locality.
+//list heads embedded directly in the table for better cache locality
 
 typedef struct hash_table
 {
-    double LF_threshold;
     double LF;
     uint32_t capacity;
     uint32_t count;
@@ -34,13 +33,25 @@ typedef struct hash_table
 
 /******************************************************************************/
 //API
-//duplicate key insertion overrides previous key-value pair
-//LF_threshold triggers dynamic resize on next insertion, set < 0 for 0.7
 
-struct hash_table *htab_create(uint32_t capacity, double LF_threshold);
+struct hash_table *htab_create(uint32_t capacity);
+
+//ht is dangling after destruction
 void htab_destroy(struct hash_table *ht);
+
+//duplicate key insertion overrides previous key-value pair. returns false
+//if malloc fails during chain node creation.
 bool htab_insert(struct hash_table *ht, const char *key, const int64_t value);
+
+//value pointer must not be null, returns false if key DNE.
 bool htab_search(struct hash_table *ht, const char *key, int64_t *value);
-bool htab_remove(struct hash_table *ht, char *key);
+
+//use null value to ignore storage of removed kv pair. false if key DNE.
+bool htab_remove(struct hash_table *ht, const char *key, int64_t *value);
+
+//dynamic resize must be called explicitly by user and its grow macro must be
+//monotonic increasing. returns false if any malloc call fails.
+#define grow(n) (2 * n)
+bool htab_resize(struct hash_table **ht);
 
 #endif
