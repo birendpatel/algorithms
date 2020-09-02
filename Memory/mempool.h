@@ -26,6 +26,6 @@ void pfree(void *ptr);
 /******************************************************************************/
 //stdout debugger, show pool memory from offset word x to x + y
 
-void memmap(size_t start, size_t end);
+void memmap(size_t words);
 
 #endif

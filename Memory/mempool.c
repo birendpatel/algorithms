@@ -27,7 +27,6 @@
 * @ top : points to first open and aligned byte after the last occupied block
 * @ max_free : block.size of the largest available block
 * @ available : total bytes available outside of blocks (from *top onward)
-* @ init_size : used for memmap display
 *
 *
 *
@@ -70,7 +69,6 @@ static struct
     struct block *tail;
     size_t max_free;
     size_t available;
-    size_t init_size;
     void *pool;
     void *top;
 } 
@@ -114,7 +112,6 @@ bool mempool_init(size_t size)
         {
             manager.top = manager.pool;
             manager.available = size;
-            manager.init_size = size; //used for memmap
             return true;            
         }
     }
@@ -252,29 +249,55 @@ static void insert_node_at_tail(struct block *new)
 }
 
 /******************************************************************************/
-//display the memory contents of the pool on a 64-word page
+//display the memory contents of the pool
 
-#define MEMMAP_HEADER()                                                        \
-        do                                                                     \
-        {                                                                      \
-            printf("\n");                                                      \
-            printf("     Address              Storage          Value  \n");    \
-            printf("------------------       ---------       ---------\n");    \
-        } while(0)                                                             \
+#define MEMMAP_HEADER()                                                               \
+        do                                                                            \
+        {                                                                             \
+            printf("\n");                                                             \
+            printf("     Address              Storage                Value  \n");     \
+            printf("------------------       ---------       -------------------\n"); \
+        } while(0)                                                                    \
         
-void memmap(size_t start, size_t end)
+void memmap(size_t words)
 {
     //display memory map header
     MEMMAP_HEADER();
     
-    //find the initial word as an offset of pool[0]
-    uintptr_t start_loc = (uintptr_t) manager.pool + start * 8;
-    uintptr_t end_loc = start_loc + end * 8;
+    uintptr_t curr = (uintptr_t) manager.pool;
+    uintptr_t end = (uintptr_t) manager.pool + words * 8;
     
-    while (start_loc != end_loc)
+    struct block *block = manager.head;
+    
+    while (curr <= end)
     {
-        printf("0x%p\n", (void*) start_loc);
-        start_loc += 8;
+        printf("0x%p", (void*) curr);
+        
+        //if we are at a list node, print its contents
+        if (curr == (uintptr_t) block)
+        {
+            printf("       previous        0x%p", (void*) block->prev);
+        }
+        else if (curr == (uintptr_t) block + 8)
+        {
+            printf("       next            0x%p", (void*) block->next);
+        }
+        else if (curr == (uintptr_t) block + 16)
+        {
+            printf("       size            %llu", block->size);
+        }
+        else if (curr == (uintptr_t) block + 24)
+        {
+            printf("       flags           A=%d, TG=%d", block->available, block->top_gap);
+            block = block->next;
+        }
+        else
+        {
+            //
+        }
+        printf("\n");
+        
+        curr += 8;
     }
     
     return;
@@ -288,10 +311,12 @@ int main(void)
     
     pmalloc(18);
     
-    pcalloc(18, 1);
+    pcalloc(24, 1);
     
-    memmap(0, 15);
+    pmalloc(8);
     
+    memmap(64);
+
     mempool_free();
     
     return 0;
