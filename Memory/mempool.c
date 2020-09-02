@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "mempool.h"
 
@@ -26,6 +27,7 @@
 * @ top : points to first open and aligned byte after the last occupied block
 * @ max_free : block.size of the largest available block
 * @ available : total bytes available outside of blocks (from *top onward)
+* @ init_size : used for memmap display
 *
 *
 *
@@ -68,6 +70,7 @@ static struct
     struct block *tail;
     size_t max_free;
     size_t available;
+    size_t init_size;
     void *pool;
     void *top;
 } 
@@ -111,6 +114,7 @@ bool mempool_init(size_t size)
         {
             manager.top = manager.pool;
             manager.available = size;
+            manager.init_size = size; //used for memmap
             return true;            
         }
     }
@@ -160,7 +164,7 @@ void *pmalloc(size_t size)
         manager.top = (void*) (((uintptr_t) manager.top + ALIGN) & ALIGN_MASK);
         
         char delta = (char) ((uintptr_t) manager.top - old_top);
-        assert((delta >= 0 || delta <= ALIGN) && "delta exceeds allowed gap");
+        assert((delta >= 0 || delta <= (char) ALIGN) && "delta exceeds gap");
         
         //place a new block node at top and add to tail of linked list
         struct block *new = manager.top;
@@ -248,16 +252,45 @@ static void insert_node_at_tail(struct block *new)
 }
 
 /******************************************************************************/
+//display the memory contents of the pool on a 64-word page
 
-#include <stdio.h>
+#define MEMMAP_HEADER()                                                        \
+        do                                                                     \
+        {                                                                      \
+            printf("\n");                                                      \
+            printf("     Address              Storage          Value  \n");    \
+            printf("------------------       ---------       ---------\n");    \
+        } while(0)                                                             \
+        
+void memmap(size_t start, size_t end)
+{
+    //display memory map header
+    MEMMAP_HEADER();
+    
+    //find the initial word as an offset of pool[0]
+    uintptr_t start_loc = (uintptr_t) manager.pool + start * 8;
+    uintptr_t end_loc = start_loc + end * 8;
+    
+    while (start_loc != end_loc)
+    {
+        printf("0x%p\n", (void*) start_loc);
+        start_loc += 8;
+    }
+    
+    return;
+}
+
+/******************************************************************************/
 
 int main(void)
 {
-    mempool_init(1000);
+    mempool_init(1024);
     
     pmalloc(18);
     
     pcalloc(18, 1);
+    
+    memmap(0, 15);
     
     mempool_free();
     
