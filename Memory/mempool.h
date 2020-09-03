@@ -24,7 +24,7 @@ void *pcalloc(size_t n, size_t size);
 void pfree(void *ptr);
 
 /******************************************************************************/
-//stdout debugger, show pool memory from offset word x to x + y
+//stdout debugger, show pool memory map of first n words
 
 void memmap(size_t words);
 
