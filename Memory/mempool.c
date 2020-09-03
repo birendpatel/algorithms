@@ -213,17 +213,17 @@ void pfree(void *ptr)
     if (ptr == NULL) return;
     
     //container of ptr
-    struct block *meta = (struct block *) ((char*) ptr - SIZEOF_BLOCK);
+    struct block *block = (struct block *) ((char*) ptr - SIZEOF_BLOCK);
     
-    //psuedo-free, don't return to system just mark the block for reuse
-    meta->available = 1;
+    //psuedo-free, can't return to system so instead mark the block for reuse
+    block->available = 1;
     
     //todo: join neighbor blocks
     //1. try to combine this with previous block
     //2. try to combine this potentially new block with the next block
     
     //notify manager
-    if (manager.max_free < meta->size) manager.max_free = meta->size;
+    if (manager.max_free < block->size) manager.max_free = block->size;
 }
 
 /******************************************************************************/
@@ -250,6 +250,19 @@ static void insert_node_at_tail(struct block *new)
 
 /******************************************************************************/
 //display the memory contents of the pool
+    
+#define memmap_manager()                                                       \
+        do                                                                     \
+        {                                                                      \
+            printf("\nHead: 0x%p\n", (void*) manager.head);                    \
+            printf("Tail: 0x%p\n", (void*) manager.tail);                      \
+            printf("Pool: 0x%p\n", (void*) manager.pool);                      \
+            printf("Top:  0x%p\n", (void*) manager.top);                       \
+            printf("Max Free:  %llu\n", manager.max_free);                     \
+            printf("Available: %llu\n", manager.available);                    \
+        }                                                                      \
+        while (0)                                                              \
+
 
 #define memmap_header()                                                        \
         do                                                                     \
@@ -259,16 +272,20 @@ static void insert_node_at_tail(struct block *new)
             printf("------------------\t---------\t----------------------\n"); \
         } while(0)                                                             \
 
+
+//an address in the memory pool can have 6 different interpretations,
+//4 of which relate to the struct block members
 #define BLOCK_PREV_FMT "0x%p      [B] prev        0x%p       \n"
 #define BLOCK_NEXT_FMT "0x%p      [B] next        0x%p       \n"
 #define BLOCK_SIZE_FMT "0x%p      [B] size        %llu       \n"
-#define BLOCK_FLAG_FMT "0x%p      [B] flag        A=%d, TG=%d\n"
+#define BLOCK_FLAG_FMT "0x%p      [B] flag        Available = %d, Gap = %d\n"
 #define BLOCK_USER_FMT "0x%p      [U]             "
 #define BLOCK_NONE_FMT "0x%p      [N]                        \n"
      
 void memmap(size_t words)
 {
     //display memory map header
+    memmap_manager();
     memmap_header();
     
     uintptr_t curr = (uintptr_t) manager.pool;
@@ -344,15 +361,13 @@ int main(void)
 {
     mempool_init(1024);
     
-    char *x = pcalloc(18, 1);
-    pcalloc(20, 1);
+    char *x = pcalloc(24, 1);
+    pcalloc(16, 1);
     pcalloc(32, 1);
     
-    x[0] = 'A';
-    x[1] = '\n';
-    x[2] = 'a';
+    pfree(x);
     
-    memmap(24);
+    memmap(32);
 
     mempool_free();
     
