@@ -85,6 +85,12 @@ manager =
 /******************************************************************************/
 //prototypes and general macros
 
+#define MEMPOOL_DEBUG 1
+
+//used in pfree to initiate block merge on available neighbors
+#define MEMPOOL_FORWARD_MERGE 1
+#define MEMPOOL_BACKWARD_MERGE 1
+
 //using 8-byte alignment to handle most types.
 //0x7 instead of 0x8 b/c alignment is just used to round down manager.top
 #define ALIGN ((uintptr_t) 0x7)
@@ -215,12 +221,78 @@ void pfree(void *ptr)
     //container of ptr
     struct block *block = (struct block *) ((char*) ptr - SIZEOF_BLOCK);
     
-    //psuedo-free, can't return to system so instead mark the block for reuse
-    block->available = 1;
+    //mark the block for reuse
+    block->available = true;
     
-    //todo: join neighbor blocks
-    //1. try to combine this with previous block
-    //2. try to combine this potentially new block with the next block
+    //merge with next block if it is available
+    #if MEMPOOL_FORWARD_MERGE
+    
+    if (block->next != NULL && block->next->available == true)
+    {
+        struct block *next_block = block->next;
+        char next_next_gap = 0;
+        
+        //set up a connection between our block and one over
+        if (next_block->next != NULL)
+        {
+            block->next = next_block->next;
+            next_block->next->prev = block;
+            next_next_gap = block->next->top_gap;
+            block->next->top_gap = 0; //these bytes will be swallowed by block
+        }
+        
+        //swallow bytes occupied by next block, its user data, and all top gaps
+        block->size += next_block->size + next_block->top_gap + SIZEOF_BLOCK +
+                       next_next_gap;
+                       
+        //clear out next block metadata, helps with memmap debugging
+        #if MEMPOOL_DEBUG
+        
+        next_block->prev = NULL;
+        next_block->next = NULL;
+        next_block->size = 0;
+        next_block->available = 0;
+        next_block->top_gap = 0;
+        
+        #endif
+    }
+    #endif
+    
+    //merge with previous block if it is available, this block disappears
+    #if MEMPOOL_BACKWARD_MERGE
+    
+    if (block->prev != NULL && block->prev->available == true)
+    {
+        struct block *prev_block = block->prev;
+        
+        //set up connect between prev block and our next
+        if (block->next != NULL)
+        {
+            prev_block->next = block->next;
+            block->next->prev = prev_block;
+            
+        }
+        
+        //swallow bytes occupied by this block, its user data, and the top gap.
+        //unlike forward merge don't swallow the top gap of block->next
+        prev_block->size += block->size + block->top_gap + SIZEOF_BLOCK;
+        
+        //clear out this block's metadata for memmap debugging
+        #if MEMPOOL_DEBUG
+        
+        block->prev = NULL;
+        block->next = NULL;
+        block->size = 0;
+        block->available = 0;
+        block->top_gap = 0;
+        
+        #endif
+        
+        //override pfree scoped block var with prev block for //notify manager
+        block = prev_block;
+    }
+    
+    #endif
     
     //notify manager
     if (manager.max_free < block->size) manager.max_free = block->size;
@@ -268,7 +340,7 @@ static void insert_node_at_tail(struct block *new)
         do                                                                     \
         {                                                                      \
             printf("\n");                                                      \
-            printf("%5sAddress%13sStorage%18sValue\n", " ", " ", " ");         \
+            printf("%5sAddress%13sStorage%17sValue\n", " ", " ", " ");         \
             printf("------------------\t---------\t----------------------\n"); \
         } while(0)                                                             \
 
@@ -361,11 +433,17 @@ int main(void)
 {
     mempool_init(1024);
     
-    char *x = pcalloc(24, 1);
-    pcalloc(16, 1);
-    pcalloc(32, 1);
+    char *x = pcalloc(22, 1);
+    char *y = pcalloc(13, 1);
+    char *z = pcalloc(27, 1);
+    char *w = pcalloc(7, 1);
+      
+    memmap(32);
     
     pfree(x);
+    pfree(y);
+    pfree(z);
+    pfree(w);
     
     memmap(32);
 
