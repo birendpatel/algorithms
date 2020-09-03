@@ -280,7 +280,7 @@ void memmap(size_t words)
     {
         if (curr == (uintptr_t) block)
         {   
-            //curr is at a pool block node so print it out over 4 words
+            //curr is at block node so an unrolled loop prints next 4 words
             printf(BLOCK_PREV_FMT, (void*) curr, (void*) block->prev);
             curr += 8;
             
@@ -305,12 +305,16 @@ void memmap(size_t words)
                 
                 for (size_t j = 0; j < 8; ++j, ++byte)
                 {
-                    if (*byte != '\0') printf("%c  ", *byte);
+                    if (*byte != '\0') 
+                    {
+                        if (*byte > 32 && *byte < 127) printf("%-3c", *byte);
+                        else printf("?  ");
+                    }
                     else printf(".  ");
                     
-                    //user memory doesn't occupy the entire word so break
-                    //the bytes in this word onwards are the top gap between 
-                    //the pool manager block nodes.
+                    //user memory doesn't occupy the entire word so need break.
+                    //the bytes from here onwards are the top gaps between the
+                    //pool manager block nodes.
                     if (--byte_cnt == 0) break;
                 }
                 
@@ -340,11 +344,13 @@ int main(void)
 {
     mempool_init(1024);
     
-    pcalloc(18, 1);
+    char *x = pcalloc(18, 1);
+    pcalloc(20, 1);
+    pcalloc(32, 1);
     
-    char *x = pcalloc(24, 1);
-    
-    pcalloc(8, 1);
+    x[0] = 'A';
+    x[1] = '\n';
+    x[2] = 'a';
     
     memmap(24);
 
