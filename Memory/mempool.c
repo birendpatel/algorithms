@@ -251,18 +251,25 @@ static void insert_node_at_tail(struct block *new)
 /******************************************************************************/
 //display the memory contents of the pool
 
-#define MEMMAP_HEADER()                                                               \
-        do                                                                            \
-        {                                                                             \
-            printf("\n");                                                             \
-            printf("     Address              Storage                Value  \n");     \
-            printf("------------------       ---------       -------------------\n"); \
-        } while(0)                                                                    \
-        
+#define memmap_header()                                                        \
+        do                                                                     \
+        {                                                                      \
+            printf("\n");                                                      \
+            printf("%5sAddress%13sStorage%18sValue\n", " ", " ", " ");         \
+            printf("------------------\t---------\t----------------------\n"); \
+        } while(0)                                                             \
+
+#define BLOCK_PREV_FMT "0x%p      [B] prev        0x%p       \n"
+#define BLOCK_NEXT_FMT "0x%p      [B] next        0x%p       \n"
+#define BLOCK_SIZE_FMT "0x%p      [B] size        %llu       \n"
+#define BLOCK_FLAG_FMT "0x%p      [B] flag        A=%d, TG=%d\n"
+#define BLOCK_USER_FMT "0x%p      [U]             "
+#define BLOCK_NONE_FMT "0x%p      [N]                        \n"
+     
 void memmap(size_t words)
 {
     //display memory map header
-    MEMMAP_HEADER();
+    memmap_header();
     
     uintptr_t curr = (uintptr_t) manager.pool;
     uintptr_t end = (uintptr_t) manager.pool + words * 8;
@@ -271,33 +278,57 @@ void memmap(size_t words)
     
     while (curr <= end)
     {
-        printf("0x%p", (void*) curr);
-        
-        //if we are at a list node, print its contents
         if (curr == (uintptr_t) block)
-        {
-            printf("       previous        0x%p", (void*) block->prev);
-        }
-        else if (curr == (uintptr_t) block + 8)
-        {
-            printf("       next            0x%p", (void*) block->next);
-        }
-        else if (curr == (uintptr_t) block + 16)
-        {
-            printf("       size            %llu", block->size);
-        }
-        else if (curr == (uintptr_t) block + 24)
-        {
-            printf("       flags           A=%d, TG=%d", block->available, block->top_gap);
+        {   
+            //curr is at a pool block node so print it out over 4 words
+            printf(BLOCK_PREV_FMT, (void*) curr, (void*) block->prev);
+            curr += 8;
+            
+            printf(BLOCK_NEXT_FMT, (void*) curr, (void*) block->next);
+            curr += 8;
+            
+            printf(BLOCK_SIZE_FMT, (void*) curr, block->size);
+            curr += 8;
+            
+            printf(BLOCK_FLAG_FMT, (void*) curr, block->available, block->top_gap);
+            curr += 8;
+            
+            //and then print the remaining user blocks using char values
+            size_t user_words = block->size/8 + (block->size % 8 != 0); //ceil
+            size_t byte_cnt = block->size;
+            
+            for (size_t i = 0; i < user_words; ++i)
+            {
+                printf(BLOCK_USER_FMT, (void*) curr);
+                
+                char *byte = (char*) curr;
+                
+                for (size_t j = 0; j < 8; ++j, ++byte)
+                {
+                    if (*byte != '\0') printf("%c  ", *byte);
+                    else printf(".  ");
+                    
+                    //user memory doesn't occupy the entire word so break
+                    //the bytes in this word onwards are the top gap between 
+                    //the pool manager block nodes.
+                    if (--byte_cnt == 0) break;
+                }
+                
+                printf("\n");
+                
+                curr += 8;
+            }
+            
+            printf("\n");
+            
             block = block->next;
         }
         else
         {
-            //
+            //this section of memory is not in use
+            printf(BLOCK_NONE_FMT, (void*) curr);
+            curr += 8;
         }
-        printf("\n");
-        
-        curr += 8;
     }
     
     return;
@@ -309,13 +340,13 @@ int main(void)
 {
     mempool_init(1024);
     
-    pmalloc(18);
+    pcalloc(18, 1);
     
-    pcalloc(24, 1);
+    char *x = pcalloc(24, 1);
     
-    pmalloc(8);
+    pcalloc(8, 1);
     
-    memmap(64);
+    memmap(24);
 
     mempool_free();
     
