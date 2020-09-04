@@ -30,21 +30,21 @@
 *
 *
 *
-*  pool start                                    top pointer
-*     |                                               |
-*     |                                               |
-*     V                                               V
+*  pool start             top gap                 top pointer
+*     |                      |                        |
+*     |                    __|__                      |
+*     V                   /     \                     V
 *
 *     #-------------------#-----#--------------------#------------------------#
 *     # block + user data #     # block + user data  #                        #
 *     #-------------------#-----#--------------------#------------------------#
 *    
-*     \__________________/\_____/                     \______________________/
-*              |             \                                available
-*              |              \
-*              |               \_________ gap between blocks
-*              |                          to ensure alignment
-*   block may be free, the size 
+*     \__________________/ \________________________/ \______________________/
+*              |               |                              available
+*              |               |
+*              |               |___________ this block will merge
+*              |                            with previous if both
+*   block may be free, the size             blocks are free
 *   of the largest free block
 *   is stored in max_free member
 *   
@@ -98,7 +98,13 @@ manager =
 
 static void insert_node_at_tail(struct block *new);
 
-/******************************************************************************/
+
+/*******************************************************************************
+* function: mempool_init
+* purpose: heap-allocated initialization of memory pool
+* @ size : total byte size of pool
+* returns: true on successful initialization
+*******************************************************************************/
 
 bool mempool_init(size_t size)
 {
@@ -123,32 +129,35 @@ bool mempool_init(size_t size)
     }
 }
 
-/******************************************************************************/
 
-bool mempool_free(void)
+/*******************************************************************************
+* function: mempool_free
+* purpose: release the memory pool to system
+*******************************************************************************/
+
+void mempool_free(void)
 {
-    if (manager.pool == NULL)
-    {
-        return false;
-    }
+    if (manager.pool == NULL) return;
     else
     {
         free(manager.pool);
         
-        //reset pool manager in case of future init
+        //reset pool manager for future mempool_init calls
         manager.head = NULL;
         manager.tail = NULL;
         manager.max_free = 0;
         manager.available = 0;
         manager.pool = NULL;
         manager.top = NULL;
-        
-        return true;
     }
 }
 
-/******************************************************************************/
-//functionality same as stdlib malloc just acting on manager.pool instead
+/*******************************************************************************
+* function: pmalloc
+* purpose: return an available memory block from the pool
+* @ size : total bytes requested
+* returns: void pointer, null if pmalloc cannot find a suitable memory block
+*******************************************************************************/
 
 void *pmalloc(size_t size)
 {
@@ -194,7 +203,13 @@ void *pmalloc(size_t size)
     }
 }
 
-/******************************************************************************/
+/*******************************************************************************
+* function: pcalloc
+* purpose: return new memory block with contents initialized to zero
+* @ n : number of array elements requested
+* @ size : byte-size of each element
+* returns: void pointer, null if pcalloc cannot find a suitable memory block
+*******************************************************************************/
 
 void *pcalloc(size_t n, size_t size)
 {
@@ -212,7 +227,12 @@ void *pcalloc(size_t n, size_t size)
     }
 }
 
-/******************************************************************************/
+
+/*******************************************************************************
+* function: pfree
+* purpose: return memory block to pool for reuse
+* @ ptr : first byte of a memory block previously passed to user via pmalloc
+*******************************************************************************/
 
 void pfree(void *ptr)
 {
@@ -224,13 +244,18 @@ void pfree(void *ptr)
     //mark the block for reuse
     block->available = true;
     
-    //merge with next block if it is available
+    //merge next block if it is available
     #if MEMPOOL_FORWARD_MERGE
     
     if (block->next != NULL && block->next->available == true)
     {
+        forward_merge: ; //goto from backward merge block
+        
         struct block *next_block = block->next;
         char next_next_gap = 0;
+        
+        //swallow bytes occupied by next block, its user data, and its top gap
+        block->size += next_block->size + next_block->top_gap + SIZEOF_BLOCK;
         
         //set up a connection between our block and one over
         if (next_block->next != NULL)
@@ -240,10 +265,22 @@ void pfree(void *ptr)
             next_next_gap = block->next->top_gap;
             block->next->top_gap = 0; //these bytes will be swallowed by block
         }
+        //next block is the tail block
+        else
+        {
+            //update current block as the new tail node
+            block->next = NULL;
+                        
+            //infer the final top gap based on alignment rules
+            next_next_gap = ALIGN + 1 - (block->size % (ALIGN + 1));
+            
+            //manager needs to know that the final top gap was swallowed so
+            //that its top pointer is not lagging behind
+            manager.top = (char*) manager.top + next_next_gap;
+        }
         
-        //swallow bytes occupied by next block, its user data, and all top gaps
-        block->size += next_block->size + next_block->top_gap + SIZEOF_BLOCK +
-                       next_next_gap;
+        //add final top gap to size;
+        block->size += next_next_gap;
                        
         //clear out next block metadata, helps with memmap debugging
         #if MEMPOOL_DEBUG
@@ -258,38 +295,14 @@ void pfree(void *ptr)
     }
     #endif
     
-    //merge with previous block if it is available, this block disappears
+    //merge with previous block if it is available, this block will disappear
     #if MEMPOOL_BACKWARD_MERGE
     
     if (block->prev != NULL && block->prev->available == true)
     {
-        struct block *prev_block = block->prev;
-        
-        //set up connect between prev block and our next
-        if (block->next != NULL)
-        {
-            prev_block->next = block->next;
-            block->next->prev = prev_block;
-            
-        }
-        
-        //swallow bytes occupied by this block, its user data, and the top gap.
-        //unlike forward merge don't swallow the top gap of block->next
-        prev_block->size += block->size + block->top_gap + SIZEOF_BLOCK;
-        
-        //clear out this block's metadata for memmap debugging
-        #if MEMPOOL_DEBUG
-        
-        block->prev = NULL;
-        block->next = NULL;
-        block->size = 0;
-        block->available = 0;
-        block->top_gap = 0;
-        
-        #endif
-        
-        //override pfree scoped block var with prev block for //notify manager
-        block = prev_block;
+        //backward merge reduces to a forward merge on the previous block
+        block = block->prev;
+        goto forward_merge;
     }
     
     #endif
@@ -298,7 +311,11 @@ void pfree(void *ptr)
     if (manager.max_free < block->size) manager.max_free = block->size;
 }
 
-/******************************************************************************/
+
+/*******************************************************************************
+* function: insert_node_at_tail
+* purpose: newly-created nodes via pmalloc are inserted at tail of block manager
+*******************************************************************************/
 
 static void insert_node_at_tail(struct block *new)
 {
@@ -320,8 +337,12 @@ static void insert_node_at_tail(struct block *new)
     }
 }
 
-/******************************************************************************/
-//display the memory contents of the pool
+
+/*******************************************************************************
+* function: memmap
+* purpose: display the memory contents of the pool to stdout
+* @ words : number of words (x64) to display from pool head onwards
+*******************************************************************************/
     
 #define memmap_manager()                                                       \
         do                                                                     \
@@ -428,6 +449,7 @@ void memmap(size_t words)
 }
 
 /******************************************************************************/
+//just some basic testing and debugging. todo: write unit tests in Unity
 
 int main(void)
 {
@@ -438,14 +460,14 @@ int main(void)
     char *z = pcalloc(27, 1);
     char *w = pcalloc(7, 1);
       
-    memmap(32);
+    memmap(27);
     
     pfree(x);
     pfree(y);
     pfree(z);
     pfree(w);
     
-    memmap(32);
+    memmap(27);
 
     mempool_free();
     

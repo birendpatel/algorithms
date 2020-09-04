@@ -14,7 +14,7 @@
 //constructors
 
 bool mempool_init(size_t size);
-bool mempool_free(void);
+void mempool_free(void);
 
 /******************************************************************************/
 //dynamic allocation functions 
