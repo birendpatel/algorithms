@@ -1,6 +1,6 @@
 /*
 * Author: Biren Patel
-* Description: Memory pool implementation.
+* Description: Memory pool implementation with 8 byte alignment
 */
 
 #include <stdbool.h>
@@ -17,40 +17,8 @@
 * purpose: doubly linked list node hidden before requested memory blocks
 * @ size : the byte-size of the memory block handed back to the user
 * @ available : flag where 1 indiciates that the block is free
-* @ top_gap : bytes between the start of this block and end of the last block
-* note: in total, if a user requests an x-byte block, x + top_gap + 32 bytes
-*       are reserved, but only x + 32 bytes are actually used.
-*
-*
-* struct: manager
-* purpose: doubly linked list and memory pool manager
-* @ top : points to first open and aligned byte after the last occupied block
-* @ max_free : block.size of the largest available block
-* @ available : total bytes available outside of blocks (from *top onward)
-*
-*
-*
-*  pool start             top gap                 top pointer
-*     |                      |                        |
-*     |                    __|__                      |
-*     V                   /     \                     V
-*
-*     #-------------------#-----#--------------------#------------------------#
-*     # block + user data #     # block + user data  #                        #
-*     #-------------------#-----#--------------------#------------------------#
-*    
-*     \__________________/ \________________________/ \______________________/
-*              |               |                              available
-*              |               |
-*              |               |___________ this block will merge
-*              |                            with previous if both
-*   block may be free, the size             blocks are free
-*   of the largest free block
-*   is stored in max_free member
-*   
+* note: in total, if a user requests an x-byte block, x + 32 bytes are reserved
 *******************************************************************************/
-
-#define SIZEOF_BLOCK 32
 
 struct block
 {
@@ -58,10 +26,16 @@ struct block
     struct block *next;
     size_t size;   
     char available;
-    char top_gap;
-    char reserved[6];
+    char reserved[7];
 };
 
+/*******************************************************************************
+* struct: manager
+* purpose: doubly linked list and memory pool manager
+* @ top : points to first open and aligned byte after the last occupied block
+* @ max_free : block.size of the largest available block
+* @ available : total bytes available outside of blocks (from *top onward)   
+*******************************************************************************/
 
 static struct
 {
@@ -82,22 +56,23 @@ manager =
     .top = NULL
 };
 
-/******************************************************************************/
-//prototypes and general macros
+/*******************************************************************************
+* prototypes and general macros
+* @ ALIGNMENT : this cannot (yet) be safely changed
+* @ ALIGN_MASK : used for fast modulus in pmalloc
+* @ SIZEOF_BLOCK : sizeof(struct block) assuming 64-bit
+* @ MEMPOOL_FORWARD_MERGE : join a free block with the next node if also free
+* @ MEMPOOL_BACKWARD_MERGE : join a free block with the prev node if also free
+*******************************************************************************/
 
 #define MEMPOOL_DEBUG 1
-
-//used in pfree to initiate block merge on available neighbors
+#define ALIGNMENT 0x8
+#define ALIGN_MASK (ALIGNMENT - 0x1)
+#define SIZEOF_BLOCK 32
 #define MEMPOOL_FORWARD_MERGE 1
 #define MEMPOOL_BACKWARD_MERGE 1
 
-//using 8-byte alignment to handle most types.
-//0x7 instead of 0x8 b/c alignment is just used to round down manager.top
-#define ALIGN ((uintptr_t) 0x7)
-#define ALIGN_MASK (~ ((uintptr_t) 0x7))
-
 static void insert_node_at_tail(struct block *new);
-
 
 /*******************************************************************************
 * function: mempool_init
@@ -122,6 +97,8 @@ bool mempool_init(size_t size)
         }
         else
         {
+            assert((uintptr_t) manager.top % ALIGNMENT == 0 && "top unaligned");
+            
             manager.top = manager.pool;
             manager.available = size;
             return true;            
@@ -163,44 +140,48 @@ void *pmalloc(size_t size)
 {
     if (size == 0) return NULL;
     
-    //try to repurpose an available block
+    //round user request upward to the next multiple of the alignment
+    size += (ALIGNMENT - (size & ALIGN_MASK)) & ALIGN_MASK;
+    
+    //try to repurpose an available block, otherwise use a new pool section
     if (size <= manager.max_free)
     {
-        return NULL;
+        struct block *block = manager.head;
+        
+        while (block != NULL)
+        {
+            //take the first node that is big enough
+            if (block->available && block->size >= size)
+            {
+                //todo: split it into two nodes if it is very large
+                block->available = false;
+                return block + 1;
+            }
+            else block = block->next;
+        }
     }
-    //otherwise use a new section of the pool
-    else if (size + ALIGN + SIZEOF_BLOCK <= manager.available)
-    {
-        //align top pointer to somewhere between old top and ALIGN-bytes above
-        uintptr_t old_top = (uintptr_t) manager.top;
-        manager.top = (void*) (((uintptr_t) manager.top + ALIGN) & ALIGN_MASK);
-        
-        char delta = (char) ((uintptr_t) manager.top - old_top);
-        assert((delta >= 0 || delta <= (char) ALIGN) && "delta exceeds gap");
-        
+    else if (size + SIZEOF_BLOCK <= manager.available)
+    {  
         //place a new block node at top and add to tail of linked list
         struct block *new = manager.top;
         
         new->size = size;
         new->available = false;
-        new->top_gap = delta;
         insert_node_at_tail(new);
         
         //update manager, move top a la sbrk() and note total bytes used
-        manager.available -= SIZEOF_BLOCK + size + delta;
+        manager.available -= SIZEOF_BLOCK + size;
         manager.top = (char*) manager.top + (SIZEOF_BLOCK + size);
         
-        //hide the metadata and return 32 bytes above for user to use
-        assert((uintptr_t) new % 8 == 0 && "struct block not aligned");
-        assert((uintptr_t) (new + 1) % 8 == 0 && "user block not aligned");
+        //hide the metadata and return 32 bytes above for user to use        
+        assert((uintptr_t) new % ALIGNMENT == 0 && "block not aligned");
+        assert((uintptr_t) (new + 1) % ALIGNMENT == 0 && "user not aligned");
         
         return new + 1;
     }
-    else
-    {
-        //not enough memory at top to accomodate list node + user block
-        return NULL;
-    }
+    
+    //not enough memory at top to accomodate list node + user block
+    return NULL;
 }
 
 /*******************************************************************************
@@ -213,8 +194,10 @@ void *pmalloc(size_t size)
 
 void *pcalloc(size_t n, size_t size)
 {
-    //todo: check for overflow before passing
-    void *address = pmalloc(n * size);
+    //todo: check for overflow before passing bytes var
+    size_t bytes = size * n;
+    
+    void *address = pmalloc(bytes);
     
     if (address == NULL)
     {
@@ -222,11 +205,11 @@ void *pcalloc(size_t n, size_t size)
     }
     else
     {
-        memset(address, 0, n * size);
+        //ignore extra bytes that pmalloc may allocate to maintain alignment
+        memset(address, 0, bytes);
         return address;
     }
 }
-
 
 /*******************************************************************************
 * function: pfree
@@ -249,38 +232,24 @@ void pfree(void *ptr)
     
     if (block->next != NULL && block->next->available == true)
     {
-        forward_merge: ; //goto from backward merge block
+        //goto from MEMPOOL_BACKWARD_MERGE
+        forward_merge: ;
         
         struct block *next_block = block->next;
-        char next_next_gap = 0;
         
-        //swallow bytes occupied by next block, its user data, and its top gap
-        block->size += next_block->size + next_block->top_gap + SIZEOF_BLOCK;
+        //swallow bytes occupied by next block and its user data
+        block->size += next_block->size + SIZEOF_BLOCK;
         
-        //set up a connection between our block and one over
+        //connect our block and one over, or make it as the new tail
         if (next_block->next != NULL)
         {
             block->next = next_block->next;
             next_block->next->prev = block;
-            next_next_gap = block->next->top_gap;
-            block->next->top_gap = 0; //these bytes will be swallowed by block
         }
-        //next block is the tail block
         else
         {
-            //update current block as the new tail node
             block->next = NULL;
-                        
-            //infer the final top gap based on alignment rules
-            next_next_gap = ALIGN + 1 - (block->size % (ALIGN + 1));
-            
-            //manager needs to know that the final top gap was swallowed so
-            //that its top pointer is not lagging behind
-            manager.top = (char*) manager.top + next_next_gap;
         }
-        
-        //add final top gap to size;
-        block->size += next_next_gap;
                        
         //clear out next block metadata, helps with memmap debugging
         #if MEMPOOL_DEBUG
@@ -289,7 +258,6 @@ void pfree(void *ptr)
         next_block->next = NULL;
         next_block->size = 0;
         next_block->available = 0;
-        next_block->top_gap = 0;
         
         #endif
     }
@@ -371,7 +339,7 @@ static void insert_node_at_tail(struct block *new)
 #define BLOCK_PREV_FMT "0x%p      [B] prev        0x%p       \n"
 #define BLOCK_NEXT_FMT "0x%p      [B] next        0x%p       \n"
 #define BLOCK_SIZE_FMT "0x%p      [B] size        %llu       \n"
-#define BLOCK_FLAG_FMT "0x%p      [B] flag        Available = %d, Gap = %d\n"
+#define BLOCK_FLAG_FMT "0x%p      [B] flag        %d         \n"
 #define BLOCK_USER_FMT "0x%p      [U]             "
 #define BLOCK_NONE_FMT "0x%p      [N]                        \n"
      
@@ -400,12 +368,11 @@ void memmap(size_t words)
             printf(BLOCK_SIZE_FMT, (void*) curr, block->size);
             curr += 8;
             
-            printf(BLOCK_FLAG_FMT, (void*) curr, block->available, block->top_gap);
+            printf(BLOCK_FLAG_FMT, (void*) curr, block->available);
             curr += 8;
             
             //and then print the remaining user blocks using char values
-            size_t user_words = block->size/8 + (block->size % 8 != 0); //ceil
-            size_t byte_cnt = block->size;
+            size_t user_words = block->size/8;
             
             for (size_t i = 0; i < user_words; ++i)
             {
@@ -421,11 +388,6 @@ void memmap(size_t words)
                         else printf("?  ");
                     }
                     else printf(".  ");
-                    
-                    //user memory doesn't occupy the entire word so need break.
-                    //the bytes from here onwards are the top gaps between the
-                    //pool manager block nodes.
-                    if (--byte_cnt == 0) break;
                 }
                 
                 printf("\n");
@@ -455,7 +417,7 @@ int main(void)
 {
     mempool_init(1024);
     
-    char *x = pcalloc(22, 1);
+    char *x = pcalloc(24, 1);
     char *y = pcalloc(13, 1);
     char *z = pcalloc(27, 1);
     char *w = pcalloc(7, 1);
@@ -468,7 +430,7 @@ int main(void)
     pfree(w);
     
     memmap(27);
-
+   
     mempool_free();
     
     return 0;
