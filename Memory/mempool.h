@@ -21,6 +21,7 @@ void mempool_free(void);
 
 void *pmalloc(size_t size);
 void *pcalloc(size_t n, size_t size);
+void *prealloc(void *ptr, size_t size);
 void pfree(void *ptr);
 
 /******************************************************************************/

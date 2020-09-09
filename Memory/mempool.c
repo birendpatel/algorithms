@@ -60,7 +60,7 @@ manager =
 * @ SIZEOF_BLOCK : sizeof(struct block) assuming 64-bit
 * @ MEMPOOL_FORWARD_MERGE : join a free block with the next node if also free
 * @ MEMPOOL_BACKWARD_MERGE : join a free block with the prev node if also free
-* @ MIN_BLOCK_SPLIT: pmalloc else clause, minimum threshold to split free block
+* @ MIN_SPLIT: pmalloc else clause, minimum threshold to split free block
 *******************************************************************************/
 
 #define MEMPOOL_DEBUG 1
@@ -69,9 +69,11 @@ manager =
 #define SIZEOF_BLOCK 32
 #define MEMPOOL_FORWARD_MERGE 1
 #define MEMPOOL_BACKWARD_MERGE 1
-#define MIN_BLOCK_SPLIT 40
+#define MIN_SPLIT 40
+#define CONTAINER_OF(ptr) ((struct block*) ((char*) ptr - SIZEOF_BLOCK))
 
 static void insert_node_at_tail(struct block *new);
+static void split_block(struct block *block, size_t size);
 
 /*******************************************************************************
 * function: mempool_init
@@ -170,22 +172,7 @@ void *pmalloc(size_t size)
             if (block->available && block->size >= size)
             {
                 //split block into two if it is large enough
-                if (block->size - size >= MIN_BLOCK_SPLIT)
-                {
-                    uintptr_t delta = (uintptr_t) block + SIZEOF_BLOCK + size;
-                    struct block *new = (struct block*) delta;
-
-                    new->prev = block;
-                    new->next = block->next;
-                    new->size = block->size - size - SIZEOF_BLOCK;
-                    new->available = true;
-
-                    if (block->next != NULL) block->next->prev = new;
-                    else manager.tail = new;
-
-                    block->next = new;
-                    block->size -= SIZEOF_BLOCK + new->size;
-                }
+                if (block->size - size >= MIN_SPLIT) split_block(block, size);
 
                 block->available = false;
 
@@ -211,7 +198,7 @@ void *pmalloc(size_t size)
 
 void *pcalloc(size_t n, size_t size)
 {
-    //todo: check for overflow before passing bytes var
+    //todo: check for overflow before passing bytes var and return error
     size_t bytes = size * n;
 
     void *address = pmalloc(bytes);
@@ -229,6 +216,56 @@ void *pcalloc(size_t n, size_t size)
 }
 
 /*******************************************************************************
+* function: prealloc
+* purpose: change the size of the memory block pointed to by ptr to size bytes
+* @ ptr : first byte of a memory block previously passed to user via pmalloc
+*******************************************************************************/
+
+void *prealloc(void *ptr, size_t size)
+{
+    //prealloc reduces to pmalloc or pfree on degenerate arguments
+    if (ptr == NULL) return pmalloc(size);
+    
+    if (ptr != NULL && size == 0) 
+    {
+        pfree(ptr);
+        return ptr;
+    }
+    
+    //round user request upward to the next multiple of the alignment
+    size += (ALIGNMENT - (size & ALIGN_MASK)) & ALIGN_MASK;
+    
+    struct block *block = CONTAINER_OF(ptr);
+    
+    if (block->size == size) 
+    {
+        //new request still fits the alignment padding so do nothing
+        return ptr;
+    }
+    else if (block->size > size)
+    {
+        //user requests less memory, split the block if possible else do nothing
+        if (block->size - size >= MIN_SPLIT) split_block(block, size);
+        
+        return block + 1;
+    }
+    else
+    {
+        //request for more memory, first allocate a new block
+        void *new = pmalloc(size);
+        if (new == NULL) return NULL;
+        
+        //then copy contents to new block
+        memcpy(new, ptr, block->size);
+        
+        //finally free old block
+        pfree(ptr);
+        
+        return new;
+    }
+}
+
+/*******************************************************************************
 * function: pfree
 * purpose: return memory block to pool for reuse
 * @ ptr : first byte of a memory block previously passed to user via pmalloc
@@ -238,8 +275,7 @@ void pfree(void *ptr)
 {
     if (ptr == NULL) return;
 
-    //container of ptr
-    struct block *block = (struct block *) ((char*) ptr - SIZEOF_BLOCK);
+    struct block *block = CONTAINER_OF(ptr);
 
     //mark the block for reuse
     block->available = true;
@@ -320,6 +356,30 @@ static void insert_node_at_tail(struct block *new)
     }
 }
 
+/*******************************************************************************
+* function: split_block
+* purpose: split an existing block into two new neighbor blocks
+*******************************************************************************/
+
+static void split_block(struct block *block, size_t size)
+{
+    uintptr_t delta = (uintptr_t) block + SIZEOF_BLOCK + size;
+    struct block  *new = (struct block *) delta;
+    
+    new->prev = block;
+    new->next = block->next;
+    new->size = block->size - size - SIZEOF_BLOCK;
+    new->available = true;
+    
+    if (block->next != NULL) block->next->prev = new;
+    else manager.tail = new;
+    
+    block->next = new;
+    assert(size == block->size - SIZEOF_BLOCK - new->size && "block mismatch");
+    block->size = size;
+    
+    return;
+}
 
 /*******************************************************************************
 * function: memmap
@@ -429,26 +489,21 @@ void memmap(size_t words)
 
 int main(void)
 {
-    mempool_init(120);
+    mempool_init(1024);
 
-    char *x = pcalloc(88, 1);
-    pfree(x);
-
-    char *y = pcalloc(8, 1);
-
-    char *z = pcalloc(8, 1);
-    pfree(z);
-
-    char *w = pcalloc(8, 1);
-
-    pcalloc(8, 1);
-
-    pfree(w);
-    pfree(y);
-
-    memmap(15);
-
-    mempool_free();
+    char *x = pcalloc(24, 1);
+    
+    char *y = prealloc(x, 32);
+    
+    char *z = prealloc(y, 64);
+    
+    char *w = pcalloc(16, 1);
+    
+    w[0] = 'Z';
+    
+    z[63] = 'Z';
+    
+    memmap(32);
 
     return 0;
 }
