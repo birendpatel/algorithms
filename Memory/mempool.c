@@ -55,21 +55,23 @@ manager =
 
 /*******************************************************************************
 * prototypes and general macros
-* @ ALIGNMENT : this cannot (yet) be safely changed
-* @ ALIGN_MASK : used for fast modulus in pmalloc
+* @ ALIGNMENT : this macro cannot be modified
+* @ ALIGN_MASK : used for alignment modulus masking
+* @ ROUND_TO_ALIGN : round value upward to the next multiple of the alignment
 * @ SIZEOF_BLOCK : sizeof(struct block) assuming 64-bit
 * @ MEMPOOL_FORWARD_MERGE : join a free block with the next node if also free
 * @ MEMPOOL_BACKWARD_MERGE : join a free block with the prev node if also free
-* @ MIN_SPLIT: pmalloc else clause, minimum threshold to split free block
+* @ MIN_SPLIT: minimum byte threshold required to call split_block()
+* @ CONTAINER_OF : access block node via pointer to first byte of user memory
 *******************************************************************************/
 
-#define MEMPOOL_DEBUG 1
 #define ALIGNMENT 0x8
 #define ALIGN_MASK (ALIGNMENT - 0x1)
+#define ROUND_TO_ALIGN(value) (value += ((ALIGNMENT - (value & ALIGN_MASK)) & ALIGN_MASK))
+        
 #define SIZEOF_BLOCK 32
-#define MEMPOOL_FORWARD_MERGE 1
-#define MEMPOOL_BACKWARD_MERGE 1
 #define MIN_SPLIT 40
+
 #define CONTAINER_OF(ptr) ((struct block*) ((char*) ptr - SIZEOF_BLOCK))
 
 static void insert_node_at_tail(struct block *new);
@@ -84,49 +86,36 @@ static void split_block(struct block *block, size_t size);
 
 bool mempool_init(size_t size)
 {
-    if (manager.pool != NULL || size == 0)
-    {
-        return false;
-    }
-    else
-    {
-        manager.pool = malloc(size);
+    if (size == 0) return false;
+    if (manager.pool != NULL) return false;
+    
+    manager.pool = malloc(size);
+    if (manager.pool == NULL) return false;
+    
+    assert((uintptr_t) manager.top % ALIGNMENT == 0 && "top unaligned");
 
-        if (manager.pool == NULL)
-        {
-            return false;
-        }
-        else
-        {
-            assert((uintptr_t) manager.top % ALIGNMENT == 0 && "top unaligned");
-
-            manager.top = manager.pool;
-            manager.available = size;
-            return true;
-        }
-    }
+    manager.top = manager.pool;
+    manager.available = size;
+    return true;
 }
 
 
 /*******************************************************************************
 * function: mempool_free
-* purpose: release the memory pool to system
+* purpose: release the memory pool and reset the pool manager
 *******************************************************************************/
 
 void mempool_free(void)
 {
     if (manager.pool == NULL) return;
-    else
-    {
-        free(manager.pool);
 
-        //reset pool manager for future mempool_init calls
-        manager.head = NULL;
-        manager.tail = NULL;
-        manager.available = 0;
-        manager.pool = NULL;
-        manager.top = NULL;
-    }
+    free(manager.pool);
+
+    manager.head = NULL;
+    manager.tail = NULL;
+    manager.available = 0;
+    manager.pool = NULL;
+    manager.top = NULL;
 }
 
 /*******************************************************************************
@@ -139,9 +128,8 @@ void mempool_free(void)
 void *pmalloc(size_t size)
 {
     if (size == 0) return NULL;
-
-    //round user request upward to the next multiple of the alignment
-    size += (ALIGNMENT - (size & ALIGN_MASK)) & ALIGN_MASK;
+    
+    ROUND_TO_ALIGN(size);
 
     //try to obtain memory from pool top, else repurpose an available block
     if (size + SIZEOF_BLOCK <= manager.available)
@@ -232,8 +220,7 @@ void *prealloc(void *ptr, size_t size)
         return ptr;
     }
     
-    //round user request upward to the next multiple of the alignment
-    size += (ALIGNMENT - (size & ALIGN_MASK)) & ALIGN_MASK;
+    ROUND_TO_ALIGN(size);
     
     struct block *block = CONTAINER_OF(ptr);
     
@@ -281,11 +268,9 @@ void pfree(void *ptr)
     block->available = true;
 
     //merge next block if it is available
-    #if MEMPOOL_FORWARD_MERGE
-
     if (block->next != NULL && block->next->available == true)
     {
-        //goto from MEMPOOL_BACKWARD_MERGE
+        //goto from backward merge
         forward_merge: ;
 
         struct block *next_block = block->next;
@@ -304,30 +289,15 @@ void pfree(void *ptr)
             block->next = NULL;
             manager.tail = block;
         }
-
-        //clear out next block metadata, helps with memmap debugging
-        #if MEMPOOL_DEBUG
-
-        next_block->prev = NULL;
-        next_block->next = NULL;
-        next_block->size = 0;
-        next_block->available = 0;
-
-        #endif
     }
-    #endif
-
+    
     //merge with previous block if it is available, this block will disappear
-    #if MEMPOOL_BACKWARD_MERGE
-
     if (block->prev != NULL && block->prev->available == true)
     {
         //backward merge reduces to a forward merge on the previous block
         block = block->prev;
         goto forward_merge;
     }
-
-    #endif
 }
 
 
