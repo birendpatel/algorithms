@@ -1,6 +1,8 @@
 /*
 * Author: Biren Patel
-* Description: Memory pool implementation with 8 byte alignment
+* Description: Memory pool implementation with 8 byte alignment. Managed by a
+* circular doubly linked list of nodes embedded at the head of each user block.
+* Nodes may merge or split during pfree and prealloc to reduce fragmentation. 
 */
 
 #include <stdbool.h>
@@ -14,7 +16,7 @@
 
 /*******************************************************************************
 * struct: block
-* purpose: doubly linked list node hidden before requested memory blocks
+* purpose: circular doubly linked list node hidden before requested memory
 * @ size : the byte-size of the memory block handed back to the user
 * @ available : flag where 1 indiciates that the block is free
 * note: in total, if a user requests an x-byte block, x + 32 bytes are reserved
@@ -31,7 +33,7 @@ struct block
 
 /*******************************************************************************
 * struct: manager
-* purpose: doubly linked list and memory pool manager
+* purpose: manager for the circular doubly linked list and memory pool
 * @ top : points to first open and aligned byte after the last occupied block
 * @ available : total bytes available outside of blocks (from *top onward)
 *******************************************************************************/
@@ -57,25 +59,22 @@ manager =
 * prototypes and general macros
 * @ ALIGNMENT : this macro cannot be modified
 * @ ALIGN_MASK : used for alignment modulus masking
-* @ ROUND_TO_ALIGN : round value upward to the next multiple of the alignment
+* @ ROUND_TO_ALIGN : round a value upward to the next multiple of the alignment
 * @ SIZEOF_BLOCK : sizeof(struct block) assuming 64-bit
-* @ MEMPOOL_FORWARD_MERGE : join a free block with the next node if also free
-* @ MEMPOOL_BACKWARD_MERGE : join a free block with the prev node if also free
-* @ MIN_SPLIT: minimum byte threshold required to call split_block()
+* @ MIN_SPLIT: minimum byte threshold required to call split_this_block()
 * @ CONTAINER_OF : access block node via pointer to first byte of user memory
 *******************************************************************************/
 
 #define ALIGNMENT 0x8
 #define ALIGN_MASK (ALIGNMENT - 0x1)
-#define ROUND_TO_ALIGN(value) (value += ((ALIGNMENT - (value & ALIGN_MASK)) & ALIGN_MASK))
-        
+#define ROUND_TO_ALIGN(value) (value += ((ALIGNMENT - (value & ALIGN_MASK)) & ALIGN_MASK))      
 #define SIZEOF_BLOCK 32
 #define MIN_SPLIT 40
-
 #define CONTAINER_OF(ptr) ((struct block*) ((char*) ptr - SIZEOF_BLOCK))
 
-static void insert_node_at_tail(struct block *new);
-static void split_block(struct block *block, size_t size);
+static inline void insert_node_at_tail(struct block *new);
+static inline void split_this_block(struct block *block, size_t size);
+static inline void merge_next_block(struct block *block);
 
 /*******************************************************************************
 * function: mempool_init
@@ -86,16 +85,34 @@ static void split_block(struct block *block, size_t size);
 
 bool mempool_init(size_t size)
 {
-    if (size == 0) return false;
+    //64 bytes of metadata + 8 bytes of user data required at a minimum
+    ROUND_TO_ALIGN(size);
+    if (size < 72) return false;
+    
+    //disallow simultaneous pools
     if (manager.pool != NULL) return false;
     
     manager.pool = malloc(size);
     if (manager.pool == NULL) return false;
-    
     assert((uintptr_t) manager.top % ALIGNMENT == 0 && "top unaligned");
 
     manager.top = manager.pool;
     manager.available = size;
+    
+    //create a permanent dummy block to reduce code needed for list operations
+    struct block *dummy = manager.top;
+    
+    manager.head = dummy;
+    manager.tail = dummy;
+    manager.available -= SIZEOF_BLOCK;
+    manager.top = dummy + 1;
+    
+    //dummy acts as both the head and tail of the circular list
+    dummy->prev = dummy;
+    dummy->next = dummy;
+    dummy->size = 0;
+    dummy->available = false;
+    
     return true;
 }
 
@@ -153,14 +170,14 @@ void *pmalloc(size_t size)
     }
     else
     {
-        struct block *block = manager.head;
+        struct block *block = manager.head->next;
 
-        while (block != NULL)
+        while (block != manager.tail)
         {
             if (block->available && block->size >= size)
             {
                 //split block into two if it is large enough
-                if (block->size - size >= MIN_SPLIT) split_block(block, size);
+                if (block->size - size >= MIN_SPLIT) split_this_block(block, size);
 
                 block->available = false;
 
@@ -169,7 +186,7 @@ void *pmalloc(size_t size)
             else block = block->next;
         }
 
-        assert(block == NULL && "incomplete list walk");
+        assert(block == manager.tail && "incomplete circular list walk");
     }
 
     //not enough free memory in pool to fulfill the user request
@@ -191,10 +208,7 @@ void *pcalloc(size_t n, size_t size)
 
     void *address = pmalloc(bytes);
 
-    if (address == NULL)
-    {
-        return NULL;
-    }
+    if (address == NULL) return NULL;
     else
     {
         //ignore extra bytes that pmalloc may allocate to maintain alignment
@@ -231,21 +245,17 @@ void *prealloc(void *ptr, size_t size)
     }
     else if (block->size > size)
     {
-        //user requests less memory, split the block if possible else do nothing
-        if (block->size - size >= MIN_SPLIT) split_block(block, size);
+        //user requests less memory, split if possible else do nothing
+        if (block->size - size >= MIN_SPLIT) split_this_block(block, size);
         
         return block + 1;
     }
     else
     {
-        //request for more memory, first allocate a new block
+        //request for more memory
         void *new = pmalloc(size);
         if (new == NULL) return NULL;
-        
-        //then copy contents to new block
         memcpy(new, ptr, block->size);
-        
-        //finally free old block
         pfree(ptr);
         
         return new;
@@ -263,75 +273,42 @@ void pfree(void *ptr)
     if (ptr == NULL) return;
 
     struct block *block = CONTAINER_OF(ptr);
-
-    //mark the block for reuse
     block->available = true;
 
-    //merge next block if it is available
-    if (block->next != NULL && block->next->available == true)
+    //forward merge
+    if (block->next->available == true) 
     {
-        //goto from backward merge
-        forward_merge: ;
-
-        struct block *next_block = block->next;
-
-        //swallow bytes occupied by next block and its user data
-        block->size += next_block->size + SIZEOF_BLOCK;
-
-        //connect our block and one over, or make it as the new tail
-        if (next_block->next != NULL)
-        {
-            block->next = next_block->next;
-            next_block->next->prev = block;
-        }
-        else
-        {
-            block->next = NULL;
-            manager.tail = block;
-        }
+        merge_next_block(block);
     }
     
-    //merge with previous block if it is available, this block will disappear
-    if (block->prev != NULL && block->prev->available == true)
+    //backward merge (equivalent to forward merge on prev block)
+    if (block->prev->available == true)
     {
-        //backward merge reduces to a forward merge on the previous block
         block = block->prev;
-        goto forward_merge;
+        merge_next_block(block);
     }
 }
-
 
 /*******************************************************************************
 * function: insert_node_at_tail
-* purpose: newly-created nodes via pmalloc are inserted at tail of block manager
+* purpose: place a new block node just before the list tail dummy block.
 *******************************************************************************/
 
-static void insert_node_at_tail(struct block *new)
+static inline void insert_node_at_tail(struct block *new)
 {
-    if (manager.head == NULL)
-    {
-        //insert into empty list
-        manager.head = new;
-        manager.tail = new;
-        new->prev = NULL;
-        new->next = NULL;
-    }
-    else
-    {
-        //insert at tail
-        new->prev = manager.tail;
-        new->next = NULL;
-        manager.tail->next = new;
-        manager.tail = new;
-    }
+    new->prev = manager.tail->prev;
+    new->next = manager.tail;
+    manager.tail->prev->next = new;
+    manager.tail->prev = new;
+    
 }
 
 /*******************************************************************************
-* function: split_block
+* function: split_this_block
 * purpose: split an existing block into two new neighbor blocks
 *******************************************************************************/
 
-static void split_block(struct block *block, size_t size)
+static inline void split_this_block(struct block *block, size_t size)
 {
     uintptr_t delta = (uintptr_t) block + SIZEOF_BLOCK + size;
     struct block  *new = (struct block *) delta;
@@ -341,14 +318,30 @@ static void split_block(struct block *block, size_t size)
     new->size = block->size - size - SIZEOF_BLOCK;
     new->available = true;
     
-    if (block->next != NULL) block->next->prev = new;
-    else manager.tail = new;
-    
+    block->next->prev = new;    
     block->next = new;
     assert(size == block->size - SIZEOF_BLOCK - new->size && "block mismatch");
     block->size = size;
     
     return;
+}
+
+
+/*******************************************************************************
+* function: merge_next_block
+* purpose: merge the supplied block with its next neighbor
+*******************************************************************************/
+
+static inline void merge_next_block(struct block *block)
+{
+    struct block *next_block = block->next;
+
+    //swallow bytes occupied by next block and its user data
+    block->size += next_block->size + SIZEOF_BLOCK;
+
+    //connect our block and one over, or make it as the new tail
+    block->next = next_block->next;
+    next_block->next->prev = block;
 }
 
 /*******************************************************************************
@@ -459,21 +452,26 @@ void memmap(size_t words)
 
 int main(void)
 {
-    mempool_init(1024);
-
-    char *x = pcalloc(24, 1);
+    mempool_init(112);
     
-    char *y = prealloc(x, 32);
+    char *x = pcalloc(48, 1);
     
-    char *z = prealloc(y, 64);
+    char *y = prealloc(x, 8);
+    
+    y[0] = 'Z';
+    
+    char *z = pmalloc(3);
+    
+    z[2] = 'Y';
+    
+    pfree(z);
+    pfree(y);
     
     char *w = pcalloc(16, 1);
     
-    w[0] = 'Z';
+    w[15] = '9';
     
-    z[63] = 'Z';
-    
-    memmap(32);
+    memmap(14);
 
     return 0;
 }
