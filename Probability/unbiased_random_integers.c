@@ -6,11 +6,7 @@
 * rewrite it from memory as a little exericse.
 */
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <time.h>
 
 /*******************************************************************************
 * I realize that __builtin_clzll() exists. Even in pure C this can be knocked
@@ -52,5 +48,3 @@ uint64_t unbiased_rand (uint64_t (*prng)(void), uint64_t max)
 
     return rand;
 }
-
-/******************************************************************************/
