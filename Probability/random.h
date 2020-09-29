@@ -17,17 +17,15 @@
 /*******************************************************************************
 * struct: random_t
 * @ state : must be seeded prior to any method calls.
-* @ next : generate a 64-bit psuedo random number using the underlying PRNG. The
-*          state is updated and the number is returned.
-* @ rand : generate an unsigned unbiased integer in [min, max) using a rejection
-*          sampling bitmask.
+* @ next : call to rng_generator()
+* @ rand : call to rng_rand()
 *******************************************************************************/
 
 typedef struct
 {
     uint64_t state;
     uint64_t (*next) (uint64_t *state);
-    uint64_t (*rand) (uint64_t *state, uint64_t min, uint64_t max);
+    uint64_t (*rand) (uint64_t *state, const uint64_t min, const uint64_t max);
 } random_t;
 
 /*******************************************************************************
@@ -39,7 +37,7 @@ typedef struct
 * rng_rdseed64 failure. 
 *******************************************************************************/
 
-random_t rng_init(uint64_t seed, uint8_t retry);
+random_t rng_init(const uint64_t seed, const uint8_t retry);
 
 /*******************************************************************************
 * rng_verify_rdseed
@@ -63,14 +61,24 @@ int rng_verify_rdseed(void);
 * returns: false on failure
 *******************************************************************************/
 
-bool rng_rdseed64(uint64_t *seed, uint8_t retry);
+bool rng_rdseed64(uint64_t *seed, const uint8_t retry);
 
 /*******************************************************************************
 * rng_generator
-* purpose: generate a 64-bit psuedo random number using the default PRNG.
+* purpose: generate 1 unsigned 64-bit psuedo random number via the default PRNG.
 * returns: random number not guaranteed equal to the updated state parameter.
 *******************************************************************************/
 
 uint64_t rng_generator(uint64_t *state);
+
+/*******************************************************************************
+* rng_rand
+* purpose: generate a unsigned unbiased 64-bit psuedo random number in a range
+* @ min : inclusive lower bound
+* @ max : exclusive upper bound
+* returns : 0 if null state. non-null state will be updated.
+*******************************************************************************/
+
+uint64_t rng_rand (uint64_t *state, const uint64_t min, const uint64_t max);
 
 #endif

@@ -57,7 +57,7 @@ int rng_verify_rdseed(void)
 
 /******************************************************************************/
 
-bool rng_rdseed64(uint64_t *seed, uint8_t retry)
+bool rng_rdseed64(uint64_t *seed, const uint8_t retry)
 {
     if (seed == NULL) return false;
 
@@ -121,12 +121,13 @@ static uint64_t mix (uint64_t value)
 
 /******************************************************************************/
 
-random_t rng_init(uint64_t seed, uint8_t retry)
+random_t rng_init(const uint64_t seed, const uint8_t retry)
 {
     random_t rng;
     
     //set up prototypes
     rng.next = rng_generator;
+    rng.rand = rng_rand;
     
     //set up seed
     if (seed == 0)
@@ -146,6 +147,31 @@ random_t rng_init(uint64_t seed, uint8_t retry)
 
 /******************************************************************************/
 
+uint64_t rng_rand (uint64_t *state, const uint64_t min, const uint64_t max)
+{    
+    //errors map to zero and degenerate cases cause early stopping
+    if (state == NULL || max - min == 0) return 0;
+    if (max - min < 2) return min;
+    
+    //sample a value from [0, scaled_max)
+    uint64_t sample;
+    uint64_t scaled_max = max - min - 1;
+    uint64_t bitmask = ~((uint64_t) 0) >> __builtin_clzll(scaled_max);
+    
+    //rejection sampling on the generator output
+    do 
+    {
+        sample = rng_generator(state) & bitmask;
+    } 
+    while (sample > scaled_max);
+    
+    //scale back to user range
+    return sample + min;
+}
+
+/******************************************************************************/
+
+#define print_uint64(value) printf("%" PRIu64 "\n", value);
 int main(void)
 {
     random_t rng = rng_init(42, 0);
@@ -157,7 +183,15 @@ int main(void)
     {
         uint64_t value = rng.next(self);
         
-        printf("%" PRIu64 "\n", value);
+        print_uint64(value);
+    }
+    
+    puts("");
+    for (size_t i = 0; i < 20; ++i)
+    {
+        uint64_t value = rng.rand(self, 0, 3);
+        
+        print_uint64(value);
     }
     
     return EXIT_SUCCESS;
