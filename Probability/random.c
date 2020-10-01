@@ -193,11 +193,11 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 5  : //0.01953125
                 return (((b(1) & b(2)) | b(3)) & b(4)) & b(5) & b(6) & b(7) & b(8);
         case 6  : //0.0234375
-                return 0;
+                return b(1) & b(2) & b(3) & b(4) & b(5) & (b(6) | b(7));
         case 7  : //0.02734375
-                return 0;
+                return (b(1) | b(2) | b(3)) & b(4) & b(5) & b(6) & b(7) & b(8);
         case 8  : //0.03125
-                return 0;
+                return b(1) & b(2) & b(3) & b(4) & b(5);
         case 9  : //0.03515625
                 return 0;
         case 10 : //0.0390625
@@ -205,15 +205,15 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 11 : //0.04296875
                 return 0;
         case 12 : //0.046875
-                return 0;
+                return (b(1) | b(2)) & b(3) & b(4) & b(5) & b(6);
         case 13 : //0.05078125
                 return 0;
         case 14 : //0.0546875
-                return 0;
+                return (b(1) | b(2) | b(3)) & b(4) & b(5) & b(6) & b(7);
         case 15 : //0.05859375
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4)) & b(5) & b(6) & b(7) & b(8);
         case 16 : //0.0625
-                return 0;
+                return b(1) & b(2) & b(3) & b(4);
         case 17 : //0.06640625
                 return 0;
         case 18 : //0.0703125
@@ -229,7 +229,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 23 : //0.08984375
                 return 0;
         case 24 : //0.09375
-                return 0;
+                return (b(1) | b(2)) & b(3) & b(4) & b(5);
         case 25 : //0.09765625
                 return 0;
         case 26 : //0.1015625
@@ -237,17 +237,17 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 27 : //0.10546875
                 return 0;
         case 28 : //0.109375
-                return 0;
+                return (b(1) | b(2) | b(3)) & b(4) & b(5) & b(6);
         case 29 : //0.11328125
                 return 0;
         case 30 : //0.1171875
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4)) & b(5) & b(6) & b(7);
         case 31 : //0.12109375
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4) | b(5)) & b(6) & b(7) & b(8);
         case 32 : //0.125
-                return 0;
+                return b(1) & b(2) & b(3);
         case 33 : //0.12890625
-                return 0;
+                return ((b(1) & b(2) & b(3) & b(4) & b(5)) | b(6)) & b(7) & b(8);
         case 34 : //0.1328125
                 return 0;
         case 35 : //0.13671875
@@ -277,7 +277,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 47 : //0.18359375
                 return 0;
         case 48 : //0.1875
-                return 0;
+                return (b(1) | b(2)) & b(3) & b(4);
         case 49 : //0.19140625
                 return 0;
         case 50 : //0.1953125
@@ -293,7 +293,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 55 : //0.21484375
                 return 0;
         case 56 : //0.21875
-                return 0;
+                return (b(1) | b(2) | b(3)) & b(4) & b(5);
         case 57 : //0.22265625
                 return 0;
         case 58 : //0.2265625
@@ -301,19 +301,19 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 59 : //0.23046875
                 return 0;
         case 60 : //0.234375
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4)) & b(5) & b(6);
         case 61 : //0.23828125
                 return 0;
         case 62 : //0.2421875
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4) | b(5)) & b(6) & b(7);
         case 63 : //0.24609375
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4) | b(5) | b(6)) & b(7) & b(8);
         case 64 : //0.25
-                return 0;
+                return b(1) & b(2);
         case 65 : //0.25390625
-                return 0;
+                return ((b(1) & b(2) & b(3) & b(4) & b(5) & b(6)) | b(7)) & b(8);
         case 66 : //0.2578125
-                return 0;
+                return ((b(1) & b(2) & b(3) & b(4) & b(5)) | b(6)) & b(7);
         case 67 : //0.26171875
                 return 0;
         case 68 : //0.265625
@@ -373,9 +373,9 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 95 : //0.37109375
                 return 0;
         case 96 : //0.375
-                return 0;
+                return (b(1) | b(2)) & b(3);
         case 97 : //0.37890625
-                return 0;
+                return ((b(1) & b(2) & b(3) & b(4) & b(5)) | b(6) | b(7)) & b(8);
         case 98 : //0.3828125
                 return 0;
         case 99 : //0.38671875
@@ -405,7 +405,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 111: //0.43359375
                 return 0;
         case 112: //0.4375
-                return 0;
+                return (b(1) | b(2) | b(3)) & b(4);
         case 113: //0.44140625
                 return 0;
         case 114: //0.4453125
@@ -421,7 +421,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 119: //0.46484375
                 return 0;
         case 120: //0.46875
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4)) & b(5);
         case 121: //0.47265625
                 return 0;
         case 122: //0.4765625
@@ -429,23 +429,23 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 123: //0.48046875
                 return 0;
         case 124: //0.484375
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4) | b(5)) & b(6);
         case 125: //0.48828125
                 return 0;
         case 126: //0.4921875
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4) | b(5) | b(6)) & b(7);
         case 127: //0.49609375
-                return 0;
+                return (b(1) | b(2) | b(3) | b(4) | b(5) | b(6) | b(7)) & b(8);
         case 128: //0.5
                 return b(1);
         case 129: //0.50390625
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5) & b(6) & b(7)) | b(8);
         case 130: //0.5078125
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5) & b(6)) | b(7);
         case 131: //0.51171875
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5) & (b(6) | b(7))) | b(8);
         case 132: //0.515625
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5)) | b(6);
         case 133: //0.51953125
                 return 0;
         case 134: //0.5234375
@@ -503,7 +503,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 160: //0.625
                 return 0;
         case 161: //0.62890625
-                return 0;
+                return (((b(1) & b(2) & b(3) & b(4) & b(5)) | b(6)) & b(7)) | b(8);
         case 162: //0.6328125
                 return 0;
         case 163: //0.63671875
@@ -565,11 +565,11 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 191: //0.74609375
                 return 0;
         case 192: //0.75
-                return 0;
+                return b(1) | b(2);
         case 193: //0.75390625
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5) & b(6)) | b(7) | b(8);
         case 194: //0.7578125
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5)) | b(6) | b(7);
         case 195: //0.76171875
                 return 0;
         case 196: //0.765625
@@ -629,9 +629,9 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 223: //0.87109375
                 return 0;
         case 224: //0.875
-                return 0;
+                return b(1) | b(2) | b(3);
         case 225: //0.87890625
-                return 0;
+                return (b(1) & b(2) & b(3) & b(4) & b(5)) | b(6) | b(7) | b(8);
         case 226: //0.8828125
                 return 0;
         case 227: //0.88671875
@@ -661,7 +661,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 239: //0.93359375
                 return 0;
         case 240: //0.9375
-                return 0;
+                return b(1) | b(2) | b(3) | b(4);
         case 241: //0.94140625
                 return 0;
         case 242: //0.9453125
@@ -677,7 +677,7 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 247: //0.96484375
                 return 0;
         case 248: //0.96875
-                return 0;
+                return b(1) | b(2) | b(3) | b(4) | b(5);
         case 249: //0.97265625
                 return 0;
         case 250: //0.9765625
@@ -685,13 +685,13 @@ uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
         case 251: //0.98046875
                 return 0;
         case 252: //0.984375
-                return 0;
+                return b(1) | b(2) | b(3) | b(4) | b(5) | b(6);
         case 253: //0.98828125
                 return 0;
         case 254: //0.9921875
-                return 0;
+                return b(1) | b(2) | b(3) | b(4) | b(5) | b(6) | b(7);
         case 255: //0.99609375
-                return 0;
+                return b(1) | b(2) | b(3) | b(4) | b(5) | b(6) | b(7) | b(8);
                 
         default :
                 return 0;
