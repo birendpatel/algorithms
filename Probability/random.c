@@ -6,10 +6,7 @@
 #include "random.h"
 
 #include <string.h>
-
-#include <stdio.h>
-#include <inttypes.h>
-#include <stdlib.h>
+#include <math.h>
 
 /******************************************************************************/
 //static prototypes
@@ -26,7 +23,7 @@ static uint64_t mix (uint64_t value);
             : "a" ((uint32_t) leaf), "c" ((uint32_t) subleaf)                  \
         )                                                                      \
 
-int rng_verify_rdseed(void)
+int rng_verify_hardware(void)
 {
     struct
     {
@@ -128,6 +125,7 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     //set up prototypes
     rng.next = rng_generator;
     rng.rand = rng_rand;
+    rng.bias = rng_bias;
     
     //set up seed
     if (seed == 0)
@@ -147,7 +145,7 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
 
 /******************************************************************************/
 
-uint64_t rng_rand (uint64_t *state, const uint64_t min, const uint64_t max)
+uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
 {    
     //errors map to zero and degenerate cases cause early stopping
     if (state == NULL || max - min == 0) return 0;
@@ -171,28 +169,27 @@ uint64_t rng_rand (uint64_t *state, const uint64_t min, const uint64_t max)
 
 /******************************************************************************/
 
-#define print_uint64(value) printf("%" PRIu64 "\n", value);
-int main(void)
+uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
 {
-    random_t rng = rng_init(42, 0);
-    #define self &rng.state
+    if (state == NULL) return 0;
     
-    printf("start state: %" PRIu64 "\n", rng.state);
+    #define b(i) (rng_generator(state))
     
-    for (size_t i = 0; i < 10; ++i)
+    switch(resolution)
     {
-        uint64_t value = rng.next(self);
-        
-        print_uint64(value);
+        case 0  : //0.0
+                return (uint64_t) 0;
+        case 1  : //0.00390625
+                return b(1) & b(2) & b(3) & b(4) & b(5) & b(6) & b(7) & b(8);
+        case 2  : //0.0078125
+                return b(1) & b(2) & b(3) & b(4) & b(5) & b(6) & b(7);
+        case 3  : //0.01171875
+                return b(1) & b(2) & b(3) & b(4) & b(5) & b(6) & (b(7) | b(8));
+        case 4  : //0.015625
+                return b(1) & b(2) & b(3) & b(4) & b(5) & b(6);
+        default : //use this for test cases
+                return b(1) | (b(2) & (b(3) | b(4)));
     }
     
-    puts("");
-    for (size_t i = 0; i < 20; ++i)
-    {
-        uint64_t value = rng.rand(self, 0, 3);
-        
-        print_uint64(value);
-    }
-    
-    return EXIT_SUCCESS;
+    #undef b
 }
