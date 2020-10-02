@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdbool.h>
+#include "timeit.h"
 #include "random.h"
 
 bool test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct(void)
@@ -52,9 +53,47 @@ bool test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct(void)
     return true;
 }
 
+/******************************************************************************/
+
+void test_compare_execution_time_of_rng_generator_to_rng_bias(void)
+{
+    random_t rng = rng_init(0, 100);
+    if (rng.state == 0)
+    {
+        fprintf(stderr, "rdseed instruction failed\n");
+        abort();
+    }
+    
+    init_timeit();
+    
+    start_timeit();
+    
+    for (size_t i = 0; i < 1000000; ++i)
+    {
+        rng.next(&rng.state);
+    }
+    
+    end_timeit();
+    
+    printf("xorshift: %lld microseconds\n", TIMEIT_RESULT_MICROSECONDS);
+    
+    start_timeit();
+    
+    for (size_t i = 0; i < 1000000; ++i)
+    {
+        rng.bias(&rng.state, 1);
+    }
+    
+    end_timeit();
+    
+    printf("biased: %lld micrseconds\n", TIMEIT_RESULT_MICROSECONDS);
+}
+
 int main(void)
 {
-    test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct();
+    //test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct();
+    
+    test_compare_execution_time_of_rng_generator_to_rng_bias();
     
     return EXIT_SUCCESS;
 }
