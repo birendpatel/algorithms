@@ -14,7 +14,7 @@ bool test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct(void)
 {
     //arrange: test all 256 resolutions with 1 million simulations each
     enum {SAMPLES = 1000000};
-    enum {RESOLUTION_MAX = 5};
+    enum {RESOLUTION_MAX = 256};
     double result[RESOLUTION_MAX];
     
     random_t rng = rng_init(0, 100);
@@ -46,7 +46,7 @@ bool test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct(void)
     for (size_t i = 0; i < RESOLUTION_MAX; ++i)
     {
         printf("%llu: (actual) %-10g \t (true) %10g\n", i, result[i], base);
-        base += 0.00390625;
+        base += 0.00390625; //a little floating imprecision but good enough
     }
     
     return true;

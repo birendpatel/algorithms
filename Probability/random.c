@@ -168,47 +168,40 @@ uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
 }
 
 /******************************************************************************/
-//A portion of the bit pattern of the resolution argument is interpreted as 
-//bitcode. This bitcode is executed in a small virtual machine which accumulates
-//bias on a target word during each machine cycle.
+//This function uses a virtual machine to interpret a portion of the bit pattern
+//in the resolution parameter as executable bitcode. I am not sure if this 
+//technique is common knowledge, but I wrote a short essay on stackoverflow, my
+//username is Ollie: https://stackoverflow.com/questions/35795110/
 
 uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
 {
     if (state == NULL) return 0;
     
+    //registers
+    uint64_t R0 = 0;
+    uint8_t  PC = __builtin_ctz(resolution|0x80);
+    
     //opcodes
     enum
     {
-        OP_AND = 0,
-        OP_OR = 1
+        OP_ANDI = 0,
+        OP_ORI  = 1,
     };
     
-    //resolution bit length limits max instructions
-    enum
+    //execute instructions in sequence from LSB -> MSB
+    while (PC != (uint8_t) 0x8)
     {
-        MAX_PC = 8
-    };
-    
-    //the executable bitcode starts at the first nonzero LSB
-    uint_fast8_t PC = __builtin_ctz(resolution|1);
-    
-    //track accumulated bias on each VM cycle
-    uint64_t target = 0;
-    
-    while (PC != MAX_PC)
-    {
-        //load instructions in order from LSB -> MSB
-        switch((resolution >> PC++) & 0x1)
+        switch((resolution >> PC++) & (uint8_t) 0x1)
         {
-            case OP_AND:
-                target &= rng_generator(state);
+            case OP_ANDI:
+                R0 &= rng_generator(state);
                 break;
                 
-            case OP_OR:
-                target |= rng_generator(state);
+            case OP_ORI:
+                R0 |= rng_generator(state);
                 break;
         }
     }
     
-    return target;
+    return R0;
 }
