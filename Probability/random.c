@@ -6,10 +6,10 @@
 #include "random.h"
 
 #include <string.h>
-#include <math.h>
+#include <assert.h>
 
 /******************************************************************************/
-//static prototypes
+//prototypes
 
 static uint64_t mix (uint64_t value);
 
@@ -67,7 +67,7 @@ bool rng_rdseed64(uint64_t *seed, const uint8_t retry)
         : [seed] "=r" (*seed), [carry_flag] "=q" (carry_flag)
     );
 
-    //first request failed, now try again with pause instructions
+    //request failed, try again with pauses
     if (!carry_flag)
     {
         for (uint8_t i = 0; i < retry; ++i)
@@ -126,6 +126,7 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     rng.next = rng_generator;
     rng.rand = rng_rand;
     rng.bias = rng_bias;
+    rng.binom = rng_binomial;
     
     //set up seed
     if (seed == 0)
@@ -169,39 +170,51 @@ uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
 
 /******************************************************************************/
 //This function uses a virtual machine to interpret a portion of the bit pattern
-//in the resolution parameter as executable bitcode. I am not sure if this 
-//technique is common knowledge, but I wrote a short essay on stackoverflow, my
-//username is Ollie: https://stackoverflow.com/questions/35795110/
+//in the numerator parameter as executable bitcode. I wrote a short essay at url
+//https://stackoverflow.com/questions/35795110/ (username Ollie) to demonstrate
+//the concepts using 256 bits of resolution.
 
-uint64_t rng_bias (uint64_t *state, const uint8_t resolution)
+uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
 {
-    if (state == NULL) return 0;
+    assert(state != NULL && "generator state is null");
+    assert(n != 0 && "probability is 0");
+    assert(m > 0 && m <= 64 && "invalid base 2 exponent");
     
-    //registers
-    uint64_t R0 = 0;
-    uint8_t  PC = __builtin_ctz(resolution|0x80);
+    uint64_t accumulator = 0;
     
-    //opcodes
-    enum
+    for (int pc = __builtin_ctzll(n); pc < m; pc++)
     {
-        OP_ANDI = 0,
-        OP_ORI  = 1,
-    };
-    
-    //execute instructions in sequence from LSB -> MSB
-    while (PC != (uint8_t) 0x8)
-    {
-        switch((resolution >> PC++) & (uint8_t) 0x1)
+        switch ((n >> pc) & 1)
         {
-            case OP_ANDI:
-                R0 &= rng_generator(state);
+            case 0:
+                accumulator &= rng_generator(state);
                 break;
                 
-            case OP_ORI:
-                R0 |= rng_generator(state);
+            case 1:
+                accumulator |= rng_generator(state);
                 break;
         }
     }
     
-    return R0;
+    return accumulator;
+}
+
+/******************************************************************************/
+//Generating a number from a binomial distribution by simultaneous simulation of
+//64 iid bernoulli trials per loop. 
+
+uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m)
+{
+    uint64_t success = 0;
+    
+    while (k > 64)
+    {
+        success += __builtin_popcountll(rng_bias(state, n, m));
+        
+        k -= 64;
+    }
+    
+    success += __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
+    
+    return success;
 }

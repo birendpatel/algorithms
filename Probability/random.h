@@ -1,9 +1,9 @@
 /*
 * Author: Biren Patel
 * Description: Pseudo random number generator. This API is dependent on the GCC
-* builtin functions and Intel x86 inline assembly. Type random_t manages PRNG
-* state and provides convenient API access through its methods. Optionally, the
-* user may define and seed a 64-bit state variable.
+* builtin functions and uses Intel x86 inline assembly. Since the functions are
+* performance critical, little to no error handling is performed. Although there
+* are assertions, the user should check input parameters prior to all calls. 
 */
 
 #ifndef RANDOM_H
@@ -13,11 +13,9 @@
 #include <stdint.h>
 
 /*******************************************************************************
-* rng_verify_hardware
-* purpose: check that the hardware meets the API requirements.
+* rng_verify_hardware: check that the hardware meets the API requirements.
 * returns: YES_RDRAND_RDSEED on successful verification.
 *******************************************************************************/
-
 #define RNG_YES_RDRAND_RDSEED               0
 #define RNG_NO_RDRAND                       1
 #define RNG_NO_RDSEED                       2
@@ -27,69 +25,60 @@
 int rng_verify_hardware(void);
 
 /*******************************************************************************
-* struct: random_t
+* random_t: manage PRNG state and provide methods for API access
 * @ state : must be seeded prior to any method calls.
 * @ next : call to rng_generator()
 * @ rand : call to rng_rand()
 * @ bias : call to rng_bias()
 *******************************************************************************/
-
 typedef struct
 {
     uint64_t state;
     uint64_t (*next) (uint64_t *state);
     uint64_t (*rand) (uint64_t *state, const uint64_t min, const uint64_t max);
-    uint64_t (*bias) (uint64_t *state, const uint8_t resolution);
+    uint64_t (*bias) (uint64_t *state, const uint64_t n, const int m);
+    uint64_t (*binom) (uint64_t *state, uint64_t k, const uint64_t n, const int m);
 } random_t;
 
 /*******************************************************************************
-* rng_init
-* purpose: initialize a variable of type random_t
+* rng_init: initialize a variable of type random_t
+* returns: random_t type, where zero state indicates rng_rdseed64 failure. 
 * @ seed : set seed=0 for rng_rdseed64. Mixing function used on nonzero values.
 * @ retry : rng_rdseed64 parameter, unused if seed != 0
-* returns: random_t type with nonzero state on success. zero state indicates
-* rng_rdseed64 failure. 
 *******************************************************************************/
-
 random_t rng_init(const uint64_t seed, const uint8_t retry);
 
 /*******************************************************************************
-* rng_rdseed64
-* purpose: generate 64-bit seed using the x86 RDSEED instruction
+* rng_rdseed64: generate 64-bit seed using the x86 RDSEED instruction
+* returns: false on failure
 * @ seed : contains a valid seed only if the function returns true
 * @ retry : maximum attempts to retry instruction if the first attempt failed
-* returns: false on failure
 *******************************************************************************/
-
 bool rng_rdseed64(uint64_t *seed, const uint8_t retry);
 
 /*******************************************************************************
-* rng_generator
-* purpose: generate 1 unsigned 64-bit psuedo random number via the default PRNG.
+* rng_generator: generate a psuedo random number via the default PRNG.
 * returns: random number not guaranteed equal to the updated state parameter.
 *******************************************************************************/
-
 uint64_t rng_generator(uint64_t *state);
 
 /*******************************************************************************
-* rng_rand
-* purpose: generate an unsigned unbiased 64-bit psuedo random number in a range
-* @ min : inclusive lower bound
-* @ max : exclusive upper bound
-* returns : 0 if null state. non-null state will be updated.
+* rng_rand: generate an unbiased psuedo random number in [min, max)
+* returns : 0 if null state. non-null state will be updated
 *******************************************************************************/
-
 uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max);
 
-
 /*******************************************************************************
-* rng_bias
-* purpose: generate an unsigned biased 64-bit number. In other words, perform 
-* a total of 64 i.i.d. bernoulli trials where each trial maps to a single bit.
-* @ resolution : probability of success calculated as resolution divided by
-* 256. e.g., resolution = 1 -> 1/256 = 0.00390625 probability.
+* rng_bias: simultaneous generation of 64 iid bernoulli trials 
+* returns: 64-bit word where each bit has probability p = n/2^m of success
+* @ n : nonzero numerator of probability, not exceeding 2^m
+* @ m : nonzero denominator indicating exponent of base 2 not exceeding 64.
 *******************************************************************************/
+uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m);
 
-uint64_t rng_bias (uint64_t *state, const uint8_t resolution);
+
+/******************************************************************************/
+
+uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m);
 
 #endif
