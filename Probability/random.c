@@ -1,6 +1,6 @@
 /*
 * Author: Biren Patel
-* Description: Implementation file for pseudo random number generator.
+* Description: PRNG library implementation
 */
 
 #include "random.h"
@@ -87,8 +87,9 @@ bool rng_rdseed64(uint64_t *seed, const uint8_t retry)
     return (bool) carry_flag;
 }
 
-/******************************************************************************/
-//Marsaglia 64-bit Xorshift (temporary placeholder)
+/*******************************************************************************
+Marsaglia 64-bit Xorshift (temporary placeholder)
+*/
 
 uint64_t rng_generator(uint64_t *state)
 {
@@ -102,8 +103,9 @@ uint64_t rng_generator(uint64_t *state)
 }
 
 
-/******************************************************************************/
-//invertible mix (temporary placeholder)
+/*******************************************************************************
+invertible mix (temporary placeholder)
+*/
 
 static uint64_t mix (uint64_t value)
 {
@@ -116,19 +118,20 @@ static uint64_t mix (uint64_t value)
     return value;
 }
 
-/******************************************************************************/
+/*******************************************************************************
+The only potential point of failure on initialization is rdseed, but this would
+be a rare situation, especially on single threading.
+*/
 
 random_t rng_init(const uint64_t seed, const uint8_t retry)
 {
     random_t rng;
     
-    //set up prototypes
     rng.next = rng_generator;
     rng.rand = rng_rand;
     rng.bias = rng_bias;
-    rng.binom = rng_binomial;
+    rng.bino = rng_binomial;
     
-    //set up seed
     if (seed == 0)
     {
         if (rng_rdseed64(&rng.state, retry) == false)
@@ -144,35 +147,37 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     return rng;
 }
 
-/******************************************************************************/
+/*******************************************************************************
+Bitmask rejection sampling technique that Apple uses in their 2008 arc4random C 
+source. I made minor adjustments for a variable lower bound and inclusive upper 
+bound. I also throw away the random number after failure instead of attempting 
+to use the upper bits.
+*/
 
 uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
 {    
-    //errors map to zero and degenerate cases cause early stopping
-    if (state == NULL || max - min == 0) return 0;
-    if (max - min < 2) return min;
+    assert(state != NULL && "generator state is null");
+    assert(min < max && "bounds violation");
     
-    //sample a value from [0, scaled_max)
     uint64_t sample;
-    uint64_t scaled_max = max - min - 1;
+    uint64_t scaled_max = max - min;
     uint64_t bitmask = ~((uint64_t) 0) >> __builtin_clzll(scaled_max);
     
-    //rejection sampling on the generator output
     do 
     {
         sample = rng_generator(state) & bitmask;
     } 
     while (sample > scaled_max);
     
-    //scale back to user range
     return sample + min;
 }
 
-/******************************************************************************/
-//This function uses a virtual machine to interpret a portion of the bit pattern
-//in the numerator parameter as executable bitcode. I wrote a short essay at url
-//https://stackoverflow.com/questions/35795110/ (username Ollie) to demonstrate
-//the concepts using 256 bits of resolution.
+/*******************************************************************************
+This function uses a virtual machine to interpret a portion of the bit pattern
+in the numerator parameter as executable bitcode. I wrote a short essay at url
+https://stackoverflow.com/questions/35795110/ (username Ollie) to demonstrate
+the concepts using 256 bits of resolution.
+*/
 
 uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
 {
@@ -184,6 +189,8 @@ uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
     
     for (int pc = __builtin_ctzll(n); pc < m; pc++)
     {
+        assert(((((n >> pc) & 1) == 0) || (((n >> pc) & 1) == 1)) && "opcode");
+        
         switch ((n >> pc) & 1)
         {
             case 0:
@@ -199,22 +206,23 @@ uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
     return accumulator;
 }
 
-/******************************************************************************/
-//Generating a number from a binomial distribution by simultaneous simulation of
-//64 iid bernoulli trials per loop. 
+/*******************************************************************************
+Generate a number from a binomial distribution by simultaneous simulation of
+64 iid bernoulli trials per loop.
+*/
 
 uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m)
 {
+    assert(state != NULL && "generator state is null");
+    assert(n != 0 && "probability is 0");
+    assert(m > 0 && m <= 64 && "invalid base 2 exponent");
+    
     uint64_t success = 0;
     
-    while (k > 64)
+    for (; k > 64; k-= 64)
     {
         success += __builtin_popcountll(rng_bias(state, n, m));
-        
-        k -= 64;
     }
     
-    success += __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
-    
-    return success;
+    return success + __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
 }

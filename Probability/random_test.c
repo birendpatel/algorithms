@@ -91,7 +91,7 @@ void test_compare_execution_time_of_rng_generator_to_rng_bias(void)
     
     for (size_t i = 0; i < 1000000; ++i)
     {
-        rng.binom(&rng.state, 640, 1ULL, 64);
+        rng.bino(&rng.state, 130, 1ULL, 64);
     }
     
     end_timeit();
@@ -136,11 +136,24 @@ bool test_monte_carlo_of_64_bit_bias_is_approximately_correct(void)
 
 void test_binomial(void)
 {
-    random_t rng = rng_init(0, 100);
+    random_t rng = rng_init(0, 50);
     
     for (size_t i = 0; i < 100; ++i)
     {
-        printf("%llu\n", rng.binom(&rng.state, 250, 64, 8));
+        printf("%llu\n", rng.bino(&rng.state, 250, 64, 8));
+    }
+}
+
+
+/******************************************************************************/
+
+void test_rand(void)
+{
+    random_t rng = rng_init(0, 100);
+    
+    for (size_t i = 0; i < 50; ++i)
+    {
+        printf("%llu\n", rng.rand(&rng.state, 0, 1));
     }
 }
 
@@ -149,13 +162,15 @@ void test_binomial(void)
 int main(void)
 {
     
-    //test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct();
+    test_monte_carlo_of_all_rng_bias_resolutions_is_approximately_correct();
     
     test_compare_execution_time_of_rng_generator_to_rng_bias();
     
-    //test_monte_carlo_of_64_bit_bias_is_approximately_correct();
+    test_monte_carlo_of_64_bit_bias_is_approximately_correct();
     
-    //test_binomial();
+    test_binomial();
+    
+    test_rand();
     
     return EXIT_SUCCESS;
 }
