@@ -81,7 +81,7 @@ uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max);
 * NAME: rng_bias
 * DESC: simultaneous generation of 64 iid bernoulli trials 
 * OUTP: 64-bit word where each bit has probability p = n/2^m of success
-* @ n : nonzero numerator of probability, not exceeding 2^m
+* @ n : nonzero numerator of probability, less than 2^m
 * @ m : nonzero denominator indicating exponent of base 2 not exceeding 64.
 *******************************************************************************/
 uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m);
