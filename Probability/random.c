@@ -133,6 +133,7 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     rng.bias = rng_bias;
     rng.bino = rng_binomial;
     rng.vndb = rng_vndb;
+    rng.cycc = rng_cyclic_autocorr;
     
     if (seed == 0)
     {
@@ -147,36 +148,6 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     }
     
     return rng;
-}
-
-/*******************************************************************************
-Bitmask rejection sampling technique that Apple uses in their 2008 arc4random C 
-source. I made minor adjustments for a variable lower bound and inclusive upper 
-bound. I also throw away the random number after failure instead of attempting 
-to use the upper bits.
-*/
-
-uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
-{    
-    assert(state != NULL && "generator state is null");
-    assert(min < max && "bounds violation");
-    
-    uint64_t sample;
-    uint64_t scaled_max = max - min;
-    uint64_t bitmask = ~((uint64_t) 0) >> __builtin_clzll(scaled_max);
-    
-    assert(__builtin_clzll(bitmask) == __builtin_clzll(scaled_max) && "bad mask");
-    assert(__builtin_popcountll(bitmask) == 64 - __builtin_clzll(scaled_max) && "bad mask");
-    
-    do 
-    {
-        sample = rng_generator(state) & bitmask;
-    } 
-    while (sample > scaled_max);
-    
-    assert(sample <= scaled_max && "scaled bounds violation");
-    
-    return sample + min;
 }
 
 /*******************************************************************************
@@ -262,6 +233,83 @@ stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t
         return info;
 }
 
+/*******************************************************************************
+Cyclic lag-K autocorrelation of an n-bit stream. This uses the SCC algorithm
+from Donald Knuth as the base and adds the binary bit stream simplification
+from David Johnston's "Random Number Generators". 
+*/
+
+double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k)
+{
+    assert(src != NULL && "data pointer is null");
+    assert(n != 0 && "no data");
+    assert(k < n && "lag exceeds length of data");
+    
+    const unsigned char *source = (const unsigned char *) src;
+    
+    uint64_t i = 0;
+    uint64_t x1 = 0;
+    uint64_t x2 = 0;
+    
+    unsigned char b1 = 0;
+    unsigned char b2 = 0;
+    
+    while (i < n)
+    {
+        b1 = source[i/CHAR_BIT] & (1 << (i % CHAR_BIT));
+        b2 = source[((i + k) % n)/CHAR_BIT] & (1 << (((i + k) % n) % CHAR_BIT));
+
+        if (b1)
+        {            
+            if (b2)
+            {
+                x1++;
+            }
+            
+            x2++;
+        }
+        
+        i++;
+    }
+    
+    double numerator = ((double) n * x1 - ((double) x2 * x2));
+    double denominator = ((double) n * x2 - ((double) x2 * x2));
+    
+    assert(numerator/denominator >= -1.0 && "lower bound violation");
+    assert(numerator/denominator <= 1.0 && "upper bound violation");
+    
+    return numerator/denominator;
+}
+
+/*******************************************************************************
+Bitmask rejection sampling technique that Apple uses in their 2008 arc4random C 
+source. I made minor adjustments for a variable lower bound and inclusive upper 
+bound. I also throw away the random number after failure instead of attempting 
+to use the upper bits.
+*/
+
+uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
+{    
+    assert(state != NULL && "generator state is null");
+    assert(min < max && "bounds violation");
+    
+    uint64_t sample;
+    uint64_t scaled_max = max - min;
+    uint64_t bitmask = ~((uint64_t) 0) >> __builtin_clzll(scaled_max);
+    
+    assert(__builtin_clzll(bitmask) == __builtin_clzll(scaled_max) && "bad mask");
+    assert(__builtin_popcountll(bitmask) == 64 - __builtin_clzll(scaled_max) && "bad mask");
+    
+    do 
+    {
+        sample = rng_generator(state) & bitmask;
+    } 
+    while (sample > scaled_max);
+    
+    assert(sample <= scaled_max && "scaled bounds violation");
+    
+    return sample + min;
+}
 
 /*******************************************************************************
 Generate a number from a binomial distribution by simultaneous simulation of

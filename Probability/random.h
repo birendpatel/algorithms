@@ -45,6 +45,7 @@ typedef struct
 * @ rand : call to rng_rand()
 * @ bias : call to rng_bias()
 * @ bino : call to rng_binomial()
+* @ vndb : call to rng_vndb()
 *******************************************************************************/
 typedef struct
 {
@@ -54,6 +55,7 @@ typedef struct
     uint64_t (*bias) (uint64_t *state, const uint64_t n, const int m);
     uint64_t (*bino) (uint64_t *state, uint64_t k, const uint64_t n, const int m);
     stream_t (*vndb) (const void *src, void *dest, const uint64_t n, const uint64_t m);
+    double   (*cycc) (const void *src, const uint64_t n, const uint64_t k);
 } random_t;
 
 /*******************************************************************************
@@ -107,6 +109,14 @@ uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m);
 * @ dest : bitstream containing a capacity of at least m bits
 *******************************************************************************/
 stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t m);
+
+/*******************************************************************************
+* NAME: rng_cyclic_autocorr
+* DESC: calculation cyclic autocorrelation of an n-bit binary bitstream.
+* OUTP: lag-k cyclic correlation in inclusive range [-1.0, 1.0].
+* @ k : autocorrelation lag
+*******************************************************************************/
+double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k);
 
 /*******************************************************************************
 * NAME: rng_binomial
