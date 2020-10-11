@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
 
 /******************************************************************************/
 //prototypes
@@ -131,6 +132,7 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     rng.rand = rng_rand;
     rng.bias = rng_bias;
     rng.bino = rng_binomial;
+    rng.vndb = rng_vndb;
     
     if (seed == 0)
     {
@@ -212,55 +214,52 @@ uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
 }
 
 /*******************************************************************************
-Von Neumann Debiaser for biased bits with no autocorrelation. Feed a low
-entropy n-byte stream into the debiaser, return a high-entropy at-most-m-byte
-stream. Source blocks are fed in until enough entropy is extracted to fill a
-byte. The byte is written to destination and the process repeats. Partially
-filled blocks at the end are implicitly discarded.
+Von Neumann Debiaser for biased bits with no autocorrelation. Feed a low entropy
+n-bit bitstream into the debiaser, get a high-entropy at-most-m-bit bitstream.
+It may be that not all source bits are used and/or not all destination bits are
+filled. The source is read as consecutive bit-pairs. The destination must be
+zeroed out before the main loop since bitwise-or is used to set the bit array.
 */
 
-uint64_t rng_debiaser(void *src, const uint64_t n, void *dest, const uint64_t m)
-{
-    assert (m <= n && "extra bytes in destination cannot be filled");
-    assert (n != 0 && "no source blocks for read");
-    assert (m != 0 && "no destination blocks for write");
+stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t m)
+{  
+    assert(src != NULL && "null source");
+    assert(dest != NULL && "null dest");
+    assert(n != 0 && "nothing to read");
+    assert(m != 0 && "nowhere to write");
+    assert(n % 2 == 0 && "cannot process odd-length bitstream");
     
-    unsigned char *src_block  = (unsigned char *) src;
-    unsigned char *dest_block = (unsigned char *) dest;
+    const unsigned char *source = (const unsigned char *) src;
+    unsigned char *destination = (unsigned char *) dest;
     
-    uint64_t total = 0;    
-    uint64_t byte_pos = 0;
-    unsigned char bit_pos = 0;
-    unsigned char out = 0;
+    uint64_t write_pos = 0;
+    uint64_t read_pos = 0;
     
-    for (uint64_t i = 0; i < n; i++)
-    {
-        for (unsigned char curr = src_block[i]; curr != 0; curr >>= 2)
+    stream_t info = {.used = 0, .filled = 0};
+    memset(destination, 0, (m-1)/CHAR_BIT + 1);
+        
+    while (read_pos < n)
+    {        
+        switch ((source[read_pos/CHAR_BIT] >> (read_pos % CHAR_BIT)) & 3)
         {
-            switch (curr & 3)
-            {
-                case 1:
-                    out |= (1U << bit_pos++);
-                    break;
-                case 2:
-                    bit_pos++;
-                    break;
-            }
-            
-            if (bit_pos == 8)
-            {
-                dest_block[byte_pos++] = out;
-                total++;
-                bit_pos = 0;
-                out = 0;
-                
-                if (byte_pos == m) goto dest_filled;
-            }
+            case 1:
+                destination[write_pos/CHAR_BIT] |= 1U << (write_pos % CHAR_BIT);
+                write_pos++;
+                break;
+            case 2:
+                write_pos++;
+                break;
         }
+        
+        read_pos += 2;
+        
+        if (write_pos == m) goto destination_filled;
     }
     
-    dest_filled:
-    return total;
+    destination_filled:
+        info.used = read_pos;
+        info.filled = write_pos;
+        return info;
 }
 
 
@@ -274,6 +273,7 @@ uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m
     assert(state != NULL && "generator state is null");
     assert(n != 0 && "probability is 0");
     assert(m > 0 && m <= 64 && "invalid base 2 exponent");
+    assert(k != 0 && "no trials");
     
     uint64_t success = 0;
     

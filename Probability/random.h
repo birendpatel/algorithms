@@ -26,6 +26,18 @@
 int rng_verify_hardware(void);
 
 /*******************************************************************************
+* NAME: stream_t
+* DESC: return type for some of the functions which process bitstreams
+* @ used : generally, the number of bits used from the input stream
+* @ filled : generally, the number of bits written into the output stream
+*******************************************************************************/
+typedef struct
+{
+    uint64_t used;
+    uint64_t filled;
+} stream_t;
+
+/*******************************************************************************
 * NAME: random_t
 * DESC: manage PRNG state and provide methods for API access
 * @ state : must be seeded prior to any method calls.
@@ -41,6 +53,7 @@ typedef struct
     uint64_t (*rand) (uint64_t *state, const uint64_t min, const uint64_t max);
     uint64_t (*bias) (uint64_t *state, const uint64_t n, const int m);
     uint64_t (*bino) (uint64_t *state, uint64_t k, const uint64_t n, const int m);
+    stream_t (*vndb) (const void *src, void *dest, const uint64_t n, const uint64_t m);
 } random_t;
 
 /*******************************************************************************
@@ -85,6 +98,15 @@ uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max);
 * @ m : nonzero denominator indicating exponent of base 2 not exceeding 64.
 *******************************************************************************/
 uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m);
+
+/*******************************************************************************
+* NAME: rng_vndb
+* DESC: Von Neumann Debiaser for iid biased bits with zero autocorrelation
+* OUTP: dest is filled with stream_t.filled bits, which used stream_t.used bits
+* @ src : bitstream containing a capacity of at least n bits
+* @ dest : bitstream containing a capacity of at least m bits
+*******************************************************************************/
+stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t m);
 
 /*******************************************************************************
 * NAME: rng_binomial
