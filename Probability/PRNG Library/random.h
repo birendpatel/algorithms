@@ -1,9 +1,9 @@
 /*
 * Author: Biren Patel
-* Description: PRNG library API. Depends on GCC builtins and Intel x86 inline
-* assembly. Since the functions are performance critical, little to no error
-* handling is performed. Assertion density is high, but in optimized mode the
-* user should check input parameters where necessary.
+* Description: PRNG library for non-cryptographic purposes. This library depends
+* on GCC builtins and x86 RDRAND. Since the functions are performance critical,
+* little to no error handling is performed. Assertion density is high, but in
+* optimized mode the user should check the input parameters wherever necessary.
 */
 
 #ifndef RANDOM_H
@@ -11,19 +11,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-
-/*******************************************************************************
-* NAME: rng_verify_hardware
-* DESC: check that the hardware meets the API requirements
-* OUTP: YES_RDRAND_RDSEED on successful verification.
-*******************************************************************************/
-#define RNG_YES_RDRAND_RDSEED               0
-#define RNG_NO_RDRAND                       1
-#define RNG_NO_RDSEED                       2
-#define RNG_NO_INTEL                        3
-#define RNG_MAX_EAX_PARAMETER_TOO_LOW       4
-
-int rng_verify_hardware(void);
 
 /*******************************************************************************
 * NAME: stream_t
@@ -61,11 +48,10 @@ typedef struct
 /*******************************************************************************
 * NAME: rng_init
 * DESC: initialize a variable of type random_t
-* OUTP: type random_t where zero state indicates rdseed failure.
-* @ seed : set seed=0 for rng_rdseed64. Mixing function used on nonzero values.
-* @ retry : rng_rdseed64 parameter, unused if seed != 0
+* OUTP: type random_t where zero state indicates rdrand failure.
+* @ seed : set seed = 0 to use the x86 rdrand instruction.
 *******************************************************************************/
-random_t rng_init(const uint64_t seed, const uint8_t retry);
+random_t rng_init(const uint64_t seed);
 
 /*******************************************************************************
 * NAME: rng_rdseed64

@@ -9,101 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
-
-/******************************************************************************/
-//prototypes
-
-static uint64_t mix (uint64_t value);
-
-/******************************************************************************/
-
-#define CPUID(leaf, subleaf)                                                   \
-        __asm__ volatile                                                       \
-        (                                                                      \
-            "cpuid"                                                            \
-            : "=a" (reg.eax), "=b" (reg.ebx), "=c" (reg.ecx), "=d" (reg.edx)   \
-            : "a" ((uint32_t) leaf), "c" ((uint32_t) subleaf)                  \
-        )                                                                      \
-
-int rng_verify_hardware(void)
-{
-    struct
-    {
-        uint32_t eax;
-        uint32_t ebx;
-        uint32_t edx;
-        uint32_t ecx;
-    }
-    reg = {.eax = 0, .ebx = 0, .edx = 0, .ecx = 0};
-
-    //EAX 0 = manufacturer id formed by EBX-EDX-ECX
-    CPUID(0,0);
-    if (memcmp(&reg.ebx, "GenuineIntel", 12) != 0) return RNG_NO_INTEL;
-
-    //impossible to execute RDSEED check on this machine
-    if (reg.eax < 7) return RNG_MAX_EAX_PARAMETER_TOO_LOW;
-
-    //EAX 1 = feature flags, bit 30 of ECX register must be set
-    CPUID(1,0);
-    if ((reg.ecx >> 30 & 1) == 0) return RNG_NO_RDRAND;
-
-    //EAX 7 = extended features, bit 18 of EBX register must be set
-    CPUID(7,0);
-    if ((reg.ebx >> 18 & 1) == 0) return RNG_NO_RDSEED;
-
-    return RNG_YES_RDRAND_RDSEED;
-}
-
-/******************************************************************************/
-
-bool rng_rdseed64(uint64_t *seed, const uint8_t retry)
-{
-    if (seed == NULL) return false;
-
-    uint8_t carry_flag;
-
-    __asm__ volatile
-    (
-        "rdseed     %[seed]\n"
-        "setc       %[carry_flag]\n"
-        : [seed] "=r" (*seed), [carry_flag] "=q" (carry_flag)
-    );
-
-    //request failed, try again with pauses
-    if (!carry_flag)
-    {
-        for (uint8_t i = 0; i < retry; ++i)
-        {
-            __asm__ volatile
-            (
-                "rdseed     %[seed]\n"
-                "setc       %[carry_flag]\n"
-                "pause\n"
-                : [seed] "=r" (*seed), [carry_flag] "=q" (carry_flag)
-            );
-
-            if (carry_flag) break;
-        }
-    }
-
-    return (bool) carry_flag;
-}
-
-/*******************************************************************************
-Marsaglia 64-bit Xorshift (temporary placeholder)
-*/
-
-uint64_t rng_generator(uint64_t *state)
-{
-	uint64_t x = *state;
-    
-	x ^= x << 13;
-	x ^= x >> 7;
-	x ^= x << 17;
-    
-	return *state = x;
-}
-
+#include <immintrin.h>
 
 /*******************************************************************************
 invertible mix (temporary placeholder)
@@ -121,11 +27,29 @@ static uint64_t mix (uint64_t value)
 }
 
 /*******************************************************************************
-The only potential point of failure on initialization is rdseed, but this would
-be a rare situation, especially on single threading.
+Marsaglia 64-bit Xorshift (temporary placeholder)
 */
 
-random_t rng_init(const uint64_t seed, const uint8_t retry)
+uint64_t rng_generator(uint64_t *state)
+{
+	uint64_t x = *state;
+    
+	x ^= x << 13;
+	x ^= x >> 7;
+	x ^= x << 17;
+    
+	return *state = x;
+}
+
+/*******************************************************************************
+Since this is a purely non-crypto library, I'm using rdrand instead of rdseed
+because it is a) faster since it doesn't require a pass through an extrator for
+full entropy and b) less or almost zero-prone to underflow. David Johnston
+explains this well in 13.4 of "Random Number Generators". Per Intel docs, 10
+max calls are attempted to rdrand before an error propogates back to the caller.
+*/
+
+random_t rng_init(const uint64_t seed)
 {
     random_t rng;
     
@@ -136,16 +60,19 @@ random_t rng_init(const uint64_t seed, const uint8_t retry)
     rng.vndb = rng_vndb;
     rng.cycc = rng_cyclic_autocorr;
     
-    if (seed == 0)
+    if (seed != 0) 
     {
-        if (rng_rdseed64(&rng.state, retry) == false)
-        {
-            rng.state = 0;
-        }
+        rng.state = mix(seed);
     }
     else
     {
-        rng.state = mix(seed);
+        for (uint_fast8_t i = 0; i < 10; i++)
+        {
+            if (_rdrand64_step(&rng.state)) goto stop;
+        }
+
+        rng.state = 0;
+        stop:;
     }
     
     return rng;

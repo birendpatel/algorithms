@@ -34,7 +34,7 @@ void test_monte_carlo_of_rng_bias_at_256_bits_of_resolution(void)
 {
     //arrange
     struct tuple {float actual; float expected;} result[255];
-    random_t rng = rng_init(0, 255);
+    random_t rng = rng_init(0);
     assert(rng.state != 0 && "rdseed failure");
     float expected_counter = 0.0;
     
@@ -70,7 +70,7 @@ and 135 was selected as a non-multiple of 64.
 void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
 {
     //arrange
-    random_t rng = rng_init(0, 255);
+    random_t rng = rng_init(0);
     assert(rng.state != 0 && "rdseed failure");
     
     uint64_t input_stream[35]; //2240 input bits should be enough
@@ -126,7 +126,7 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
 void test_cyclic_autocorrelation_of_bitstream(void)
 {
     //arrange
-    random_t rng = rng_init(0, 255);
+    random_t rng = rng_init(0);
     assert(rng.state != 0 && "rdseed failure");
     
     uint64_t input_stream[100000] = {0};
@@ -147,13 +147,14 @@ void test_cyclic_autocorrelation_of_bitstream(void)
 
 /******************************************************************************/
 
+#include <immintrin.h>
+
 int main(void)
 {
     UNITY_BEGIN();
         RUN_TEST(test_monte_carlo_of_rng_bias_at_256_bits_of_resolution);
         RUN_TEST(test_von_neumann_debiaser_outputs_all_unbiased_bits);
     UNITY_END();
-    
     
     test_cyclic_autocorrelation_of_bitstream();
     
