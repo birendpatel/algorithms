@@ -130,16 +130,16 @@ void test_cyclic_autocorrelation_of_bitstream(void)
     assert(rng.state != 0 && "rdseed failure");
     
     uint64_t input_stream[100000] = {0};
-    uint64_t weyl = 1442695040888963407;
+    uint64_t weyl = 0xAAAAAAAAAAAAAAAA;
     
     for (size_t i = 0; i < 100000; i++)
     {
         input_stream[i] = weyl;
-        weyl += 1442695040888963407;
+        //weyl += 0xDEADBEEF;
     }
     
     //act
-    for (size_t i = 0; i < 192; i++)
+    for (size_t i = 0; i < 64; i++)
     {
         printf("%g\n", rng.cycc(input_stream, 6400000, i));
     }
@@ -150,8 +150,8 @@ void test_cyclic_autocorrelation_of_bitstream(void)
 int main(void)
 {
     UNITY_BEGIN();
-        //RUN_TEST(test_monte_carlo_of_rng_bias_at_256_bits_of_resolution);
-        //RUN_TEST(test_von_neumann_debiaser_outputs_all_unbiased_bits);
+        RUN_TEST(test_monte_carlo_of_rng_bias_at_256_bits_of_resolution);
+        RUN_TEST(test_von_neumann_debiaser_outputs_all_unbiased_bits);
     UNITY_END();
     
     

@@ -4,6 +4,7 @@
 */
 
 #include "random.h"
+#include "bit_array.h"
 
 #include <string.h>
 #include <assert.h>
@@ -167,8 +168,6 @@ uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
     
     for (int pc = __builtin_ctzll(n); pc < m; pc++)
     {
-        assert(((((n >> pc) & 1) == 0) || (((n >> pc) & 1) == 1)) && "opcode");
-        
         switch ((n >> pc) & 1)
         {
             case 0:
@@ -200,8 +199,8 @@ stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t
     assert(m != 0 && "nowhere to write");
     assert(n % 2 == 0 && "cannot process odd-length bitstream");
     
-    const unsigned char *source = (const unsigned char *) src;
-    unsigned char *destination = (unsigned char *) dest;
+    bitarray_init(source, src, const unsigned char *);
+    bitarray_init(destination, dest, unsigned char *);
     
     uint64_t write_pos = 0;
     uint64_t read_pos = 0;
@@ -211,10 +210,10 @@ stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t
         
     while (read_pos < n)
     {        
-        switch ((source[read_pos/CHAR_BIT] >> (read_pos % CHAR_BIT)) & 3)
+        switch (bitarray_mask_at(source, CHAR_BIT, read_pos, 0x3))
         {
             case 1:
-                destination[write_pos/CHAR_BIT] |= 1U << (write_pos % CHAR_BIT);
+                bitarray_set(destination, CHAR_BIT, write_pos);
                 write_pos++;
                 break;
             case 2:
@@ -245,23 +244,17 @@ double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k)
     assert(n != 0 && "no data");
     assert(k < n && "lag exceeds length of data");
     
-    const unsigned char *source = (const unsigned char *) src;
+    bitarray_init(source, src, const unsigned char *);
     
     uint64_t i = 0;
     uint64_t x1 = 0;
     uint64_t x2 = 0;
     
-    unsigned char b1 = 0;
-    unsigned char b2 = 0;
-    
     while (i < n)
     {
-        b1 = source[i/CHAR_BIT] & (1 << (i % CHAR_BIT));
-        b2 = source[((i + k) % n)/CHAR_BIT] & (1 << (((i + k) % n) % CHAR_BIT));
-
-        if (b1)
+        if (bitarray_test(source, CHAR_BIT, i))
         {            
-            if (b2)
+            if (bitarray_test(source, CHAR_BIT, (i + k) % n))
             {
                 x1++;
             }
@@ -328,14 +321,7 @@ uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m
     for (; k > 64; k-= 64)
     {
         success += __builtin_popcountll(rng_bias(state, n, m));
-        assert(success < k && "generated too many bernoulli trials");
     }
     
-    assert(k <= 64 && "bad loop conditions");
-    
-    success += __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
-    
-    assert(success <= k && "generated too many remainder bernoulli trials");
-    
-    return success;
+    return success + __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
 }
