@@ -12,16 +12,18 @@
 #include <immintrin.h>
 
 /*******************************************************************************
-invertible mix (temporary placeholder)
+This is used to mix a user-supplied seed, it is Sebastiano Vigna's version of
+Java's SplittableRandom: http://xoshiro.di.unimi.it/splitmix64.c but since its
+just a one-off mixing function I removed the state increment that Vigna employs.
 */
 
 static uint64_t mix (uint64_t value)
 {
-    value = (value >> 48) | (value << 16);
-    value ^= value << 30;
-    value ^= value >> 15;
-    value ^= value << 45;
-    value = (value >> 32) | (value << 32);
+    value ^=  value >> 30;
+    value *= 0xbf58476d1ce4e5b9ULL;
+    value ^= value >> 27;
+    value *= 0x94d049bb133111ebULL;
+    value ^= value >> 31;
     
     return value;
 }
@@ -45,12 +47,13 @@ uint64_t rng_generator(uint64_t *state)
 Since this is a purely non-crypto library, I'm using rdrand instead of rdseed
 because it is a) faster since it doesn't require a pass through an extrator for
 full entropy and b) less or almost zero-prone to underflow. David Johnston
-explains this well in 13.4 of "Random Number Generators". Per Intel docs, 10
+explains this well in 13.4 of "Random Number Generators". Per Intel docs, 40
 max calls are attempted to rdrand before an error propogates back to the caller.
 */
 
 random_t rng_init(const uint64_t seed)
 {
+    uint64_t block;
     random_t rng;
     
     rng.next = rng_generator;
@@ -62,19 +65,76 @@ random_t rng_init(const uint64_t seed)
     
     if (seed != 0) 
     {
-        rng.state = mix(seed);
+        block = mix(seed);
+        rng.state.current = (_uint128_t) block << 64;
+        
+        block = mix(seed);
+        rng.state.current |= block;
+        
+        block = mix(seed);
+        rng.state.increment = (_uint128_t) block << 64;
+        
+        block = mix(seed);
+        rng.state.increment |= block;
     }
     else
     {
-        for (uint_fast8_t i = 0; i < 10; i++)
+        uint_fast8_t i = 0;
+        uint_fast8_t limit = 0;
+        
+        while (i < 4)
         {
-            if (_rdrand64_step(&rng.state)) goto stop;
+            switch (i)
+            {
+                case 0:
+                    if (_rdrand64_step(&block))
+                    {
+                        rng.state.current = (_uint128_t) block << 64;
+                        i++;
+                    }
+                    limit++;
+                    break;
+                    
+                case 1:
+                    if (_rdrand64_step(&block))
+                    {
+                        rng.state.current |= block;
+                        i++;
+                    }
+                    limit++;
+                    break;
+                    
+                case 2:
+                    if (_rdrand64_step(&block))
+                    {
+                        rng.state.increment = (_uint128_t) block << 64;
+                        i++;
+                    }
+                    limit++;
+                    break;
+                    
+                case 3:
+                    if (_rdrand64_step(&block))
+                    {
+                        rng.state.increment |= block;
+                        goto rdrand_success;
+                    }
+                    limit++;
+                    break;
+            }
+            
+            if (limit == 40)
+            {
+                rng.state.current = 0;
+                rng.state.increment = 0;
+                goto rdrand_fail;
+            }
         }
-
-        rng.state = 0;
-        stop:;
+        
+        rdrand_success:;
     }
     
+    rdrand_fail:
     return rng;
 }
 
