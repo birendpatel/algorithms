@@ -66,8 +66,8 @@ void test_monte_carlo_of_rng_bias_at_256_bits_of_resolution(void)
     for (size_t i = 0; i < 255; i++)
     {
         int success = 0;
-        int numerator = i + 1;
-        expected_counter += 0.00390625;
+        uint64_t numerator = i + 1;
+        expected_counter += 0.00390625f;
         
         for (size_t j = 0; j < BIG_SIMULATION; j++)
         {
@@ -120,7 +120,7 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
         TEST_ASSERT_EQUAL_INT(135, info.filled);
         
         //ancillary points of interest
-        avg_use += info.used;
+        avg_use += (double) info.used;
         if (info.used < min_use) min_use = info.used;
         if (info.used > max_use) max_use = info.used;
         
@@ -179,9 +179,39 @@ void test_cyclic_autocorrelation_of_alternating_bitstream(void)
     }
 }
 
-/******************************************************************************/
+/*******************************************************************************
+Benchmarks on 1 million draws.
+*/
 
-#include <immintrin.h>
+#define loop for (size_t i = 0; i < 1000000; i++)
+
+void speed_test(void)
+{
+    random_t rng = rng_init(0);
+    assert(rng.state.current != 0 && "rdrand failure");
+    init_timeit();       
+    puts("\n~~~~~ Speed Tests ~~~~~");
+    
+    //base PCG 64i generator
+    start_timeit();
+    loop { rng.next(self); }
+    end_timeit();
+    printf("PCG Generator: %llu mu\n", result_timeit(MICROSECONDS));
+    
+    //rng bias at 8 generator calls
+    start_timeit();
+    loop { rng.bias(self, 1, 8); }
+    end_timeit();
+    printf("RNG Bias: %llu mu\n", result_timeit(MICROSECONDS));
+    
+    //rng binomial at no additional generator calls (overhead only)
+    start_timeit();
+    loop { rng.bino(self, 64, 1, 8); }
+    end_timeit();
+    printf("RNG Binomial: %llu mu\n", result_timeit(MICROSECONDS));
+}
+
+/******************************************************************************/
 
 int main(void)
 {
@@ -191,6 +221,8 @@ int main(void)
         RUN_TEST(test_von_neumann_debiaser_outputs_all_unbiased_bits);
         RUN_TEST(test_cyclic_autocorrelation_of_alternating_bitstream);
     UNITY_END();
+    
+    speed_test();
     
     return EXIT_SUCCESS;
 }

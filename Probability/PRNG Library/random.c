@@ -17,7 +17,10 @@ Java's SplittableRandom: http://xoshiro.di.unimi.it/splitmix64.c but since its
 just a one-off mixing function I removed the state increment that Vigna employs.
 */
 
-static uint64_t mix (uint64_t value)
+static uint64_t mix 
+(
+    uint64_t value
+)
 {
     value ^=  value >> 30;
     value *= 0xbf58476d1ce4e5b9ULL;
@@ -39,7 +42,10 @@ simply gathered the relevant macros into a single function and decomposed the
 constants into magic numbers (pcg_setseq_64_rxs_m_xs_64_random_r).
 */
 
-uint64_t rng_generator(state_t *state)
+uint64_t rng_generator
+(
+    state_t * const state
+)
 {
     uint64_t x = state->current;
     
@@ -59,7 +65,10 @@ is retried up to ten times per variable, hence the else clause goto fuckery. For
 PCG, ensure the increment is odd.
 */
 
-random_t rng_init(const uint64_t seed)
+random_t rng_init
+(
+    const uint64_t seed
+)
 {
     random_t rng;
     
@@ -112,7 +121,12 @@ https://stackoverflow.com/questions/35795110/ (username Ollie) to demonstrate
 the concepts using 256 bits of resolution.
 */
 
-uint64_t rng_bias (state_t *state, const uint64_t n, const int m)
+uint64_t rng_bias 
+(
+    state_t * const state, 
+    const uint64_t n, 
+    const int m
+)
 {
     assert(state != NULL && "generator state is null");
     assert(n != 0 && "probability is 0");
@@ -145,7 +159,13 @@ filled. The source is read as consecutive bit-pairs. The destination must be
 zeroed out before the main loop since bitwise-or is used to set the bit array.
 */
 
-stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t m)
+stream_t rng_vndb 
+(
+    const uint64_t * restrict src, 
+    uint64_t * restrict dest, 
+    const uint64_t n, 
+    const uint64_t m
+)
 {  
     assert(src != NULL && "null source");
     assert(dest != NULL && "null dest");
@@ -153,21 +173,21 @@ stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t
     assert(m != 0 && "nowhere to write");
     assert(n % 2 == 0 && "cannot process odd-length bitstream");
     
-    bitarray_init(source, src, const unsigned char *);
-    bitarray_init(destination, dest, unsigned char *);
+    u64_bitarray(src);
+    u64_bitarray(dest);
     
     uint64_t write_pos = 0;
     uint64_t read_pos = 0;
     
     stream_t info = {.used = 0, .filled = 0};
-    memset(destination, 0, (m-1)/CHAR_BIT + 1);
+    memset(dest, 0, (m-1)/CHAR_BIT + 1);
         
     while (read_pos < n)
     {        
-        switch (bitarray_mask_at(source, CHAR_BIT, read_pos, 0x3))
+        switch (u64_bitarray_mask_at(src, read_pos, 0x3ULL))
         {
             case 1:
-                bitarray_set(destination, CHAR_BIT, write_pos);
+                u64_bitarray_set(dest, write_pos);
                 write_pos++;
                 break;
             case 2:
@@ -177,10 +197,10 @@ stream_t rng_vndb (const void *src, void *dest, const uint64_t n, const uint64_t
         
         read_pos += 2;
         
-        if (write_pos == m) goto destination_filled;
+        if (write_pos == m) goto dest_filled;
     }
     
-    destination_filled:
+    dest_filled:
         info.used = read_pos;
         info.filled = write_pos;
         return info;
@@ -192,13 +212,18 @@ from Donald Knuth as the base and adds the binary bit stream simplification
 from David Johnston's "Random Number Generators". 
 */
 
-double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k)
+double rng_cyclic_autocorr
+(
+    const uint64_t *src, 
+    const uint64_t n, 
+    const uint64_t k
+)
 {
     assert(src != NULL && "data pointer is null");
     assert(n != 0 && "no data");
     assert(k < n && "lag exceeds length of data");
     
-    bitarray_init(source, src, const unsigned char *);
+    u64_bitarray(src);
     
     uint64_t i = 0;
     uint64_t x1 = 0;
@@ -206,9 +231,9 @@ double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k)
     
     while (i < n)
     {
-        if (bitarray_test(source, CHAR_BIT, i))
+        if (u64_bitarray_test(src, i))
         {            
-            if (bitarray_test(source, CHAR_BIT, (i + k) % n))
+            if (u64_bitarray_test(src, (i + k) % n))
             {
                 x1++;
             }
@@ -217,10 +242,13 @@ double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k)
         }
         
         i++;
-    }
+    }    
     
-    double numerator = ((double) n * x1 - ((double) x2 * x2));
-    double denominator = ((double) n * x2 - ((double) x2 * x2));
+    double numerator = 
+        ((double) n * (double) x1 - ((double) x2 * (double) x2));
+    
+    double denominator =
+        ((double) n * (double) x2 - ((double) x2 * (double) x2));
     
     assert(numerator/denominator >= -1.0 && "lower bound violation");
     assert(numerator/denominator <= 1.0 && "upper bound violation");
@@ -235,7 +263,12 @@ bound. I also throw away the random number after failure instead of attempting
 to use the upper bits.
 */
 
-uint64_t rng_rand(state_t *state, const uint64_t min, const uint64_t max)
+uint64_t rng_rand
+(
+    state_t * const state, 
+    const uint64_t min, 
+    const uint64_t max
+)
 {    
     assert(state != NULL && "generator state is null");
     assert(min < max && "bounds violation");
@@ -263,7 +296,13 @@ Generate a number from a binomial distribution by simultaneous simulation of
 64 iid bernoulli trials per loop.
 */
 
-uint64_t rng_binomial(state_t *state, uint64_t k, const uint64_t n, const int m)
+uint64_t rng_binomial
+(
+    state_t * const state, 
+    uint64_t k, 
+    const uint64_t n, 
+    const int m
+)
 {
     assert(state != NULL && "generator state is null");
     assert(n != 0 && "probability is 0");
@@ -274,8 +313,8 @@ uint64_t rng_binomial(state_t *state, uint64_t k, const uint64_t n, const int m)
     
     for (; k > 64; k-= 64)
     {
-        success += __builtin_popcountll(rng_bias(state, n, m));
+        success += (uint64_t) __builtin_popcountll(rng_bias(state, n, m));
     }
     
-    return success + __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
+    return success + (uint64_t) __builtin_popcountll(rng_bias(state, n, m) >> (64 - k));
 }
