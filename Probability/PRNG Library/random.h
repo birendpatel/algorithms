@@ -12,18 +12,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 /*******************************************************************************
 * NAME: state_t
 * DESC: internal state of the default PRNG
 * @ current : state value used to generate PRNG values
 * @ increment : stream identifier
 *******************************************************************************/
-
 typedef struct
 {
-    _uint128_t current;
-    _uint128_t increment;
+    uint64_t current;
+    uint64_t increment;
 } state_t;
     
 /*******************************************************************************
@@ -52,12 +50,12 @@ typedef struct
 typedef struct
 {
     state_t state;    
-    uint64_t (*next) (uint64_t *state);
-    uint64_t (*rand) (uint64_t *state, const uint64_t min, const uint64_t max);
-    uint64_t (*bias) (uint64_t *state, const uint64_t n, const int m);
+    uint64_t (*next) (state_t *state);
+    uint64_t (*rand) (state_t *state, const uint64_t min, const uint64_t max);
+    uint64_t (*bias) (state_t *state, const uint64_t n, const int m);
     stream_t (*vndb) (const void *src, void *dest, const uint64_t n, const uint64_t m);
     double   (*cycc) (const void *src, const uint64_t n, const uint64_t k);
-    uint64_t (*bino) (uint64_t *state, uint64_t k, const uint64_t n, const int m);
+    uint64_t (*bino) (state_t *state, uint64_t k, const uint64_t n, const int m);
     
 } random_t;
 
@@ -74,7 +72,7 @@ random_t rng_init(const uint64_t seed);
 * DESC: generate a psuedo random number via the default PRNG.
 * OUTP: random number not guaranteed equal to the updated state parameter.
 *******************************************************************************/
-uint64_t rng_generator(uint64_t *state);
+uint64_t rng_generator(state_t *state);
 
 /*******************************************************************************
 * NAME: rng_rand
@@ -83,7 +81,7 @@ uint64_t rng_generator(uint64_t *state);
 * @ min : inclusive lower bound
 * @ max : inclusive upper bound
 *******************************************************************************/
-uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max);
+uint64_t rng_rand(state_t *state, const uint64_t min, const uint64_t max);
 
 /*******************************************************************************
 * NAME: rng_bias
@@ -93,7 +91,7 @@ uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max);
 * @ n : nonzero numerator of probability, strictly less than 2^m
 * @ m : nonzero base 2 exponent less than or equal to 64
 *******************************************************************************/
-uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m);
+uint64_t rng_bias (state_t *state, const uint64_t n, const int m);
 
 /*******************************************************************************
 * NAME: rng_vndb
@@ -122,6 +120,6 @@ double rng_cyclic_autocorr(const void *src, const uint64_t n, const uint64_t k);
 * @ n : nonzero numerator of probability, strictly less than 2^m
 * @ m : nonzero base 2 exponent less than or equal to 64
 *******************************************************************************/
-uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m);
+uint64_t rng_binomial(state_t *state, uint64_t k, const uint64_t n, const int m);
 
 #endif

@@ -25,6 +25,30 @@ void tearDown(void) {}
 #define SMALL_SIMULATION 50000
 
 /*******************************************************************************
+Given a seed (the answer to life, the universe, everything), does PCG 64i output
+the same stream on two different random_t variables?
+*/
+
+void test_deterministic_seed_pcg_output(void)
+{
+    //arrange
+    random_t rng_1 = rng_init(42);
+    assert(rng_1.state.current != 0 && "rdrand failure");
+    
+    random_t rng_2 = rng_init(42);
+    assert(rng_2.state.current != 0 && "rdrand failure");
+    
+    //act-assert
+    for (size_t i = 0; i < BIG_SIMULATION; i++)
+    {
+        uint64_t result_1 = rng_1.next(&rng_1.state);
+        uint64_t result_2 = rng_2.next(&rng_2.state);
+        
+        TEST_ASSERT_EQUAL_UINT64(result_1, result_2);
+    }
+}
+
+/*******************************************************************************
 Check that rng_bias is correct by monte carlo simulation on probabilites of
 1/256 through 255/256. At 1,000,000 simulations with floating precision, the
 tolerance is set as +/- 0.0015.
@@ -35,7 +59,7 @@ void test_monte_carlo_of_rng_bias_at_256_bits_of_resolution(void)
     //arrange
     struct tuple {float actual; float expected;} result[255];
     random_t rng = rng_init(0);
-    assert(rng.state != 0 && "rdseed failure");
+    assert(rng.state.current != 0 && "rdrand failure");
     float expected_counter = 0.0;
     
     //act
@@ -71,7 +95,7 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
 {
     //arrange
     random_t rng = rng_init(0);
-    assert(rng.state != 0 && "rdseed failure");
+    assert(rng.state.current != 0 && "rdrand failure");
     
     uint64_t input_stream[35]; //2240 input bits should be enough
     uint64_t output_stream[3]; //space for 192 but only care about first 135
@@ -121,27 +145,37 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
     printf("minimum input bits used: %llu\n", min_use);
 }
 
-/******************************************************************************/
+/*******************************************************************************
+Given a time series of 1010101010...10 the autocorrelation at any lag k should
+alternate between 1 and -1.
+*/
 
-void test_cyclic_autocorrelation_of_bitstream(void)
+void test_cyclic_autocorrelation_of_alternating_bitstream(void)
 {
     //arrange
+    double results[64] = {0};
     random_t rng = rng_init(0);
-    assert(rng.state != 0 && "rdseed failure");
+    assert(rng.state.current != 0 && "rdrand failure");
     
     uint64_t input_stream[100000] = {0};
-    uint64_t weyl = 0xAAAAAAAAAAAAAAAA;
+    uint64_t word = 0xAAAAAAAAAAAAAAAA;
     
     for (size_t i = 0; i < 100000; i++)
     {
-        input_stream[i] = weyl;
-        //weyl += 0xDEADBEEF;
+        input_stream[i] = word;
     }
     
     //act
     for (size_t i = 0; i < 64; i++)
     {
-        printf("%g\n", rng.cycc(input_stream, 6400000, i));
+        results[i] = rng.cycc(input_stream, 6400000, i);
+    }
+    
+    //assert
+    for (size_t i = 0; i < 64; i++)
+    {
+        if (i & 1) TEST_ASSERT_EQUAL_FLOAT(-1, (float) results[i]);
+        else TEST_ASSERT_EQUAL_FLOAT(1, (float) results[i]);
     }
 }
 
@@ -152,11 +186,11 @@ void test_cyclic_autocorrelation_of_bitstream(void)
 int main(void)
 {
     UNITY_BEGIN();
+        RUN_TEST(test_deterministic_seed_pcg_output);
         RUN_TEST(test_monte_carlo_of_rng_bias_at_256_bits_of_resolution);
         RUN_TEST(test_von_neumann_debiaser_outputs_all_unbiased_bits);
+        RUN_TEST(test_cyclic_autocorrelation_of_alternating_bitstream);
     UNITY_END();
-    
-    test_cyclic_autocorrelation_of_bitstream();
     
     return EXIT_SUCCESS;
 }

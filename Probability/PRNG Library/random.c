@@ -29,113 +29,80 @@ static uint64_t mix (uint64_t value)
 }
 
 /*******************************************************************************
-Marsaglia 64-bit Xorshift (temporary placeholder)
+Permuted Congruential Generator from Melissa O'Neill. This is the insecure 64
+bit output PCG extracted from O'Neill's C implementation on pcg_random.org.
+I have made a few changes. First, the seeding is done in rng_init() using Vigna
+modified SplitMix64 for determinstic seeding. For nondeterministic seeding, I
+tap rdrand directly instead of attempting to access entropy via dev/urandom or
+stack variable XORing which O'Neill uses. For the generator itself, I have
+simply gathered the relevant macros into a single function and decomposed the
+constants into magic numbers (pcg_setseq_64_rxs_m_xs_64_random_r).
 */
 
-uint64_t rng_generator(uint64_t *state)
+uint64_t rng_generator(state_t *state)
 {
-	uint64_t x = *state;
+    uint64_t x = state->current;
     
-	x ^= x << 13;
-	x ^= x >> 7;
-	x ^= x << 17;
+    state->current = state->current * 0x5851F42D4C957F2DULL + state->increment;
     
-	return *state = x;
+    uint64_t fx = ((x >> ((x >> 59ULL) + 5ULL)) ^ x) * 0xAEF17502108EF2D9ULL;
+    
+    return (fx >> 43ULL) ^ fx;
 }
 
 /*******************************************************************************
-Since this is a purely non-crypto library, I'm using rdrand instead of rdseed
-because it is a) faster since it doesn't require a pass through an extrator for
-full entropy and b) less or almost zero-prone to underflow. David Johnston
-explains this well in 13.4 of "Random Number Generators". Per Intel docs, 40
-max calls are attempted to rdrand before an error propogates back to the caller.
+Since this is a non-crypto statistics library, I use rdrand instead of rdseed
+because it is A) faster since it doesn't require a pass through an extrator for
+full entropy and B) less or almost zero-prone to underflow. David Johnston
+explains this well in 13.4 of "Random Number Generators". Per Intel docs, rdrand
+is retried up to ten times per variable, hence the else clause goto fuckery. For
+PCG, ensure the increment is odd.
 */
 
 random_t rng_init(const uint64_t seed)
 {
-    uint64_t block;
     random_t rng;
-    
-    rng.next = rng_generator;
-    rng.rand = rng_rand;
-    rng.bias = rng_bias;
-    rng.bino = rng_binomial;
-    rng.vndb = rng_vndb;
-    rng.cycc = rng_cyclic_autocorr;
     
     if (seed != 0) 
     {
-        block = mix(seed);
-        rng.state.current = (_uint128_t) block << 64;
-        
-        block = mix(seed);
-        rng.state.current |= block;
-        
-        block = mix(seed);
-        rng.state.increment = (_uint128_t) block << 64;
-        
-        block = mix(seed);
-        rng.state.increment |= block;
+        rng.state.current = mix(seed);
+        rng.state.increment = mix(mix(seed));
     }
     else
     {
-        uint_fast8_t i = 0;
-        uint_fast8_t limit = 0;
-        
-        while (i < 4)
+        for (uint_fast8_t i = 0; i < 10; i++)
         {
-            switch (i)
+            if (_rdrand64_step(&rng.state.current))
             {
-                case 0:
-                    if (_rdrand64_step(&block))
+                for (uint_fast8_t j = 0; j < 10; j++)
+                {
+                    if (_rdrand64_step(&rng.state.increment))
                     {
-                        rng.state.current = (_uint128_t) block << 64;
-                        i++;
+                        goto success;
                     }
-                    limit++;
-                    break;
-                    
-                case 1:
-                    if (_rdrand64_step(&block))
-                    {
-                        rng.state.current |= block;
-                        i++;
-                    }
-                    limit++;
-                    break;
-                    
-                case 2:
-                    if (_rdrand64_step(&block))
-                    {
-                        rng.state.increment = (_uint128_t) block << 64;
-                        i++;
-                    }
-                    limit++;
-                    break;
-                    
-                case 3:
-                    if (_rdrand64_step(&block))
-                    {
-                        rng.state.increment |= block;
-                        goto rdrand_success;
-                    }
-                    limit++;
-                    break;
-            }
-            
-            if (limit == 40)
-            {
-                rng.state.current = 0;
-                rng.state.increment = 0;
-                goto rdrand_fail;
+                }
+                
+                goto fail;
             }
         }
         
-        rdrand_success:;
+        fail:
+            rng.state.current = 0;
+            rng.state.increment = 0;
+            goto terminate;
     }
     
-    rdrand_fail:
-    return rng;
+    success:
+        rng.state.increment |= 1;
+        rng.next = rng_generator;
+        rng.rand = rng_rand;
+        rng.bias = rng_bias;
+        rng.bino = rng_binomial;
+        rng.vndb = rng_vndb;
+        rng.cycc = rng_cyclic_autocorr;
+    
+    terminate:
+        return rng;
 }
 
 /*******************************************************************************
@@ -145,7 +112,7 @@ https://stackoverflow.com/questions/35795110/ (username Ollie) to demonstrate
 the concepts using 256 bits of resolution.
 */
 
-uint64_t rng_bias (uint64_t *state, const uint64_t n, const int m)
+uint64_t rng_bias (state_t *state, const uint64_t n, const int m)
 {
     assert(state != NULL && "generator state is null");
     assert(n != 0 && "probability is 0");
@@ -268,7 +235,7 @@ bound. I also throw away the random number after failure instead of attempting
 to use the upper bits.
 */
 
-uint64_t rng_rand(uint64_t *state, const uint64_t min, const uint64_t max)
+uint64_t rng_rand(state_t *state, const uint64_t min, const uint64_t max)
 {    
     assert(state != NULL && "generator state is null");
     assert(min < max && "bounds violation");
@@ -296,7 +263,7 @@ Generate a number from a binomial distribution by simultaneous simulation of
 64 iid bernoulli trials per loop.
 */
 
-uint64_t rng_binomial(uint64_t *state, uint64_t k, const uint64_t n, const int m)
+uint64_t rng_binomial(state_t *state, uint64_t k, const uint64_t n, const int m)
 {
     assert(state != NULL && "generator state is null");
     assert(n != 0 && "probability is 0");
