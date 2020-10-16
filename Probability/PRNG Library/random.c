@@ -9,7 +9,6 @@
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
-#include <immintrin.h>
 
 /*******************************************************************************
 This is used to mix a user-supplied seed, it is Sebastiano Vigna's version of
@@ -55,6 +54,29 @@ uint64_t rng_generator
     
     return (fx >> 43ULL) ^ fx;
 }
+
+
+/*******************************************************************************
+pcg_setseq_32_rxs_m_xs_32_random_r (1686)
+pcg_setseq_32_step_r (514)
+#define PCG_DEFAULT_MULTIPLIER_32  747796405U
+pcg_output_rxs_m_xs_32_32 (184)
+*/
+
+__m256i rng_generator_vec (state_vec_t * const state)
+{
+    //the multiplier stays constant
+    static const __m256i multiplier = _mm256_set1_epi64x((int64_t) 747796405);
+    
+    //the current state will be permuted and returned
+    __m256i x = state->current;
+    
+    //first advance state to its next step using the LCG 
+    _mm256_mul_epu32(state->current, multiplier);
+    
+    //now perform the permutation on the old state
+}
+
 
 /*******************************************************************************
 Since this is a non-crypto statistics library, I use rdrand instead of rdseed
@@ -112,6 +134,81 @@ random_t rng_init
     
     terminate:
         return rng;
+}
+
+
+/*******************************************************************************
+This it the initialization function for the AVX API. ALmost the same as above
+but expanding in groups of 4 to easily handle the vector set mechanism. I have
+not yet included 10 calls per rdrand request.
+*/
+
+random_vec_t rng_vec_init
+(
+    const uint64_t seed_1,
+    const uint64_t seed_2,
+    const uint64_t seed_3,
+    const uint64_t seed_4
+)
+{
+    random_vec_t rng_vec;
+    
+    if (seed_1 != 0 && seed_2 != 0 && seed_3 != 0 && seed_4 != 0)
+    {        
+        rng_vec.state.current = _mm256_set_epi64x
+             (
+                 (int64_t) (mix(seed_1) >> 32),
+                 (int64_t) (mix(seed_2) >> 32),
+                 (int64_t) (mix(seed_3) >> 32),
+                 (int64_t) (mix(seed_4) >> 32)                          
+             );
+                         
+        rng_vec.state.increment = _mm256_set_epi64x
+            (
+                (int64_t) ((mix(mix(seed_1)) >> 32) | 1),
+                (int64_t) ((mix(mix(seed_2)) >> 32) | 1),
+                (int64_t) ((mix(mix(seed_3)) >> 32) | 1),
+                (int64_t) ((mix(mix(seed_4)) >> 32) | 1)
+            );
+    }
+    else
+    {
+        uint64_t a;
+        uint64_t b;
+        uint64_t c;
+        uint64_t d;
+        
+        _rdrand64_step(&a);
+        _rdrand64_step(&b);
+        _rdrand64_step(&c);
+        _rdrand64_step(&d);
+        
+        rng_vec.state.current = _mm256_set_epi64x
+            (
+                 (int64_t) (a >> 32),
+                 (int64_t) (b >> 32),
+                 (int64_t) (c >> 32),
+                 (int64_t) (d >> 32)
+            );
+        
+        _rdrand64_step(&a);
+        _rdrand64_step(&b);
+        _rdrand64_step(&c);
+        _rdrand64_step(&d);
+        
+        rng_vec.state.increment = _mm256_set_epi64x
+            (
+                (int64_t) ((a >> 32) | 1),
+                (int64_t) ((b >> 32) | 1),
+                (int64_t) ((c >> 32) | 1),
+                (int64_t) ((d >> 32) | 1)
+            );
+    }
+    
+    
+    rng_vec.next_vec = rng_generator_vec;
+    
+    return rng_vec;
 }
 
 /*******************************************************************************

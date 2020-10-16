@@ -11,6 +11,12 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <immintrin.h>
+
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+//64 Bit API
 
 /*******************************************************************************
 * NAME: state_t
@@ -174,5 +180,61 @@ uint64_t rng_binomial
     const uint64_t n, 
     const int m
 );
+
+
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+//256 Bit AVX/AVX2 API
+
+/*******************************************************************************
+* NAME: state_vec_t
+* DESC: internal state of the default vectorized PRNG
+* @ current : state value of 4 independent PRNGs, used to generate PRNG values
+* @ increment : stream identifier of 4 independent streams
+*******************************************************************************/
+typedef struct
+{
+    __m256i current;
+    __m256i increment;
+} state_vec_t;
+
+/*******************************************************************************
+* NAME: random_vec_t
+* DESC: manage PRNG state and provide methods for API access
+* @ state : must be seeded with rng_init() prior to any method calls.
+* @ next : call to rng_generator()
+*******************************************************************************/
+typedef struct
+{
+    state_vec_t state;
+    
+    __m256i (*next_vec)
+    (
+        state_vec_t * const_state
+    );
+    
+} random_vec_t;
+
+/*******************************************************************************
+* NAME: rng_vec_init
+* DESC: initialize a variable of type random_vec_t
+* OUTP: type random_t where zero state indicates rdrand failure.
+* @ seed : set seed = 0 to use the x86 rdrand instruction.
+*******************************************************************************/
+random_vec_t rng_vec_init
+(
+    const uint64_t seed_1,
+    const uint64_t seed_2,
+    const uint64_t seed_3,
+    const uint64_t seed_4
+);
+
+/*******************************************************************************
+* NAME: rng_generator_vec
+* DESC: generate psuedo random numbers via the default vector PRNG.
+* OUTP: random numbers not guaranteed equal to the updated state parameters.
+*******************************************************************************/
+__m256i rng_generator_vec (state_vec_t * const state);
 
 #endif
