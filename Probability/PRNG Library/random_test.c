@@ -216,11 +216,11 @@ void speed_test(void)
 
 void test_simd_pcg_32_bit_insecure_generator(void)
 {
-    random_simd_t rng_simd = rng_simd_init(1,2,3,4);
+    simd_random_t simd_rng = simd_rng_init(1,2,3,4);
     
     for (size_t j = 0; j < 10; j++)
     {     
-        __m256i x = rng_simd.next(&rng_simd.state);
+        __m256i x = simd_rng.next(&simd_rng.state);
         
         uint64_t *fx = (uint64_t *) &x;
         

@@ -10,6 +10,7 @@
 
 #include <windows.h>
 
+#define NANOSECONDS 1000000000
 #define MICROSECONDS 1000000
 #define MILLISECONDS 1000
 #define SECONDS 1
