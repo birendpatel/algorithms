@@ -57,24 +57,46 @@ uint64_t rng_generator
 
 
 /*******************************************************************************
+Permuted Congruential Generator from Melissa O'Neill. This is the insecure 32
+bit output PCG extracted from O'Neill's C implementation on pcg_random.org.
+The major change that I have committed is to refactor the generator to use Intel
+AVX2 instruction set intrinsics. In this manner, four independent streams can be
+executed simultaneously. A decorator runs each stream twice so that in total we
+output 256 bits over two calls.
+
 pcg_setseq_32_rxs_m_xs_32_random_r (1686)
 pcg_setseq_32_step_r (514)
-#define PCG_DEFAULT_MULTIPLIER_32  747796405U
 pcg_output_rxs_m_xs_32_32 (184)
 */
 
-__m256i rng_generator_vec (state_vec_t * const state)
+__m256i rng_generator_simd 
+(
+    state_simd_t * const state
+)
 {
-    //the multiplier stays constant
-    static const __m256i multiplier = _mm256_set1_epi64x((int64_t) 747796405);
+    const __m256i lcg_mult = _mm256_set1_epi64x((int64_t) 747796405U);
+    const __m256i rxs_mult = _mm256_set1_epi64x((int64_t) 277803737U);
+    const __m256i mod32_mask = _mm256_set1_epi64x((int64_t) 0xFFFFFFFFU);
     
-    //the current state will be permuted and returned
+    //generate the output permutation of all four current states
     __m256i x = state->current;
+    __m256i fx;
     
-    //first advance state to its next step using the LCG 
-    _mm256_mul_epu32(state->current, multiplier);
+    fx = _mm256_add_epi64(_mm256_srli_epi64(x, 28), _mm256_set1_epi64x(4LL));
+    fx = _mm256_srlv_epi64(x, fx);
+    fx = _mm256_xor_si256(x, fx);
+    fx = _mm256_mul_epu32(fx, rxs_mult);
+    fx = _mm256_and_si256(fx, mod32_mask);
+    fx = _mm256_xor_si256(_mm256_srli_epi64(fx, 22), fx);    
     
-    //now perform the permutation on the old state
+    //advance all four internal states to the next step using 32-Bit LCGs    
+    state->current = _mm256_mul_epu32(state->current, lcg_mult);
+    state->current = _mm256_and_si256(state->current, mod32_mask);
+    state->current = _mm256_add_epi64(state->current, state->increment);
+    state->current = _mm256_and_si256(state->current, mod32_mask);
+    
+    //return the four permutation outputs of the previous state
+    return fx;
 }
 
 
@@ -140,10 +162,12 @@ random_t rng_init
 /*******************************************************************************
 This it the initialization function for the AVX API. ALmost the same as above
 but expanding in groups of 4 to easily handle the vector set mechanism. I have
-not yet included 10 calls per rdrand request.
+not yet included 10 calls per rdrand request. Notice for deterministic seeds
+that the state seed matches the mixed increment seed. This is to help unit test
+the generator streams.
 */
 
-random_vec_t rng_vec_init
+random_simd_t rng_simd_init
 (
     const uint64_t seed_1,
     const uint64_t seed_2,
@@ -151,7 +175,7 @@ random_vec_t rng_vec_init
     const uint64_t seed_4
 )
 {
-    random_vec_t rng_vec;
+    random_simd_t rng_vec;
     
     if (seed_1 != 0 && seed_2 != 0 && seed_3 != 0 && seed_4 != 0)
     {        
@@ -206,7 +230,7 @@ random_vec_t rng_vec_init
     }
     
     
-    rng_vec.next_vec = rng_generator_vec;
+    rng_vec.next_simd = rng_generator_simd;
     
     return rng_vec;
 }
