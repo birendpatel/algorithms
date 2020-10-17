@@ -103,7 +103,7 @@ typedef struct
 * NAME: rng_init
 * DESC: initialize a variable of type random_t
 * OUTP: type random_t where zero state and increment indicates rdrand failure.
-* @ seed : set seed = 0 to use the x86 rdrand instruction.
+* @ seed : set seed = 0 for non-deterministic seeding.
 *******************************************************************************/
 random_t rng_init(const uint64_t seed);
 

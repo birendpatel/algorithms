@@ -1,8 +1,8 @@
 /*
 * Author: Biren Patel
 * Description: PRNG library for non-cryptographic non-secure purposes such as
-* statistics and simulations. This library depends on GCC builtins and the x86 
-* instruction RDRAND. The 256-Bit API depends on the AVX/AVX2 intruction set.
+* statistics and simulations. This library depends on GCC builtins, on the x86
+* rdrand instruction, and on the AVX/AVX2 instruction sets.
 */
 
 #ifndef RANDOM_H
@@ -14,7 +14,7 @@
 //64-BIT API
 #include "random_sisd.h"
 
-//256-BIT API - AVX/AV2
+//256-BIT API
 #include "random_simd.h"
 
 #endif

@@ -1,6 +1,6 @@
 /*
 * Author: Biren Patel
-* Description: 256-Bit SIMD API (AVX/AVX2 Instruction Set)
+* Description: 256-Bit SIMD API (AVX/AVX2 Instruction Sets)
 */
 
 #ifndef RANDOM_H
@@ -17,8 +17,8 @@
 /*******************************************************************************
 * NAME: simd_state_t
 * DESC: internal state of the default vectorized PRNG
-* @ current : state value of 4 independent PRNGs, used to generate PRNG values
-* @ increment : stream identifier of 4 independent streams
+* @ current : contains state of 4 streams in lower 32 bits of each 64 bit block
+* @ increment : contain stream identifiers in lower 32 bits of each 64 bit block
 *******************************************************************************/
 typedef struct
 {
@@ -29,8 +29,8 @@ typedef struct
 /*******************************************************************************
 * NAME: simd_random_t
 * DESC: manage PRNG state and provide methods for API access
-* @ state : must be seeded with rng_init() prior to any method calls.
-* @ next_simd : call to simd_rng_generator()
+* @ state : must be seeded with simd_rng_init() prior to any method calls
+* @ next : call to simd_rng_generator()
 *******************************************************************************/
 typedef struct
 {
@@ -41,14 +41,14 @@ typedef struct
         simd_state_t * const_state
     );
     
-    char buffer[24]; //temporary to mark the padding for later refactor
+    char buffer[24]; //temporary padding marker for -Wpadded
 } simd_random_t;
 
 /*******************************************************************************
 * NAME: simd_rng_init
 * DESC: initialize a variable of type simd_random_t
-* OUTP: type random_t where zero state and increment indicates rdrand failure.
-* @ seed : set seed = 0 to use the x86 rdrand instruction.
+* OUTP: zero state and increment in return type indicates rdrand failure
+* @ seed : If any seed is zero, then all four streams will be non-determinstic
 *******************************************************************************/
 simd_random_t simd_rng_init
 (
@@ -60,8 +60,8 @@ simd_random_t simd_rng_init
 
 /*******************************************************************************
 * NAME: simd_rng_generator
-* DESC: generate psuedo random numbers via the default vector PRNG.
-* OUTP: random numbers not guaranteed equal to the updated state parameters.
+* DESC: generate 256-Bit psuedo random numbers via the default PRNG
+* OUTP: random numbers not guaranteed equal to the updated state parameters
 *******************************************************************************/
 __m256i simd_rng_generator (simd_state_t * const state);
 
