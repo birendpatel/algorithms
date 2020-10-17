@@ -3,6 +3,10 @@
 * Description: 64-Bit SISD API
 */
 
+#ifndef RANDOM_H
+#error "include random.h instead of random_sisd.h"
+#endif
+
 #ifndef SISD_RANDOM_H
 #define SISD_RANDOM_H
 
@@ -11,7 +15,6 @@
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
-#include <stdbool.h>
 
 /*******************************************************************************
 * NAME: state_t

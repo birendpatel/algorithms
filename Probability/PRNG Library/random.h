@@ -8,10 +8,13 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
+//Utilities API
+#include "random_utils.h"
+
 //64-BIT API
 #include "random_sisd.h"
 
-//256-BIT AVX/AVX2 API
+//256-BIT API - AVX/AV2
 #include "random_simd.h"
 
 #endif

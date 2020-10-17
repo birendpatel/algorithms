@@ -3,13 +3,16 @@
 * Description: 256-Bit SIMD API (AVX/AVX2 Instruction Set)
 */
 
+#ifndef RANDOM_H
+#error "include random.h instead of random_simd.h"
+#endif
+
 #ifndef SIMD_RANDOM_H
 #define SIMD_RANDOM_H
 
 #include <stdint.h>
 #include <immintrin.h>
 #include <assert.h>
-#include <stdbool.h>
 
 /*******************************************************************************
 * NAME: simd_state_t

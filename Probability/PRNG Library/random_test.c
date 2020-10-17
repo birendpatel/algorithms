@@ -212,19 +212,93 @@ void speed_test(void)
     printf("RNG Binomial: %llu us\n", result_timeit(MICROSECONDS));
 }
 
-/******************************************************************************/
+/*******************************************************************************
+Since the SIMD implemntation is quite tricky, I need to ensure that each 64 bit
+block is actually genreated from an independent PCG stream over two steps. So,
+this unit test generates those individual streams from single PCG32i streams,
+and then checks those values against the corresponding vector block. Since PCG
+32i is not a part of the API, I include those functions here.
+*/
+
+static uint64_t mix (uint64_t value)
+{
+    value ^=  value >> 30;
+    value *= 0xbf58476d1ce4e5b9ULL;
+    value ^= value >> 27;
+    value *= 0x94d049bb133111ebULL;
+    value ^= value >> 31;
+    return value;
+}
+
+struct pcg32i
+{
+    uint32_t current;
+    uint32_t increment;
+};
+
+uint32_t pcg32i_next(struct pcg32i *state)
+{
+    uint32_t x = state->current;
+    state->current = state->current * 747796405U + state->increment;
+    uint32_t fx = ((x >> ((x >> 28U) + 4U)) ^ x) * 277803737U;
+    return (fx >> 22U) ^ fx;
+}
 
 void test_simd_pcg_32_bit_insecure_generator(void)
 {
+    //arrange
     simd_random_t simd_rng = simd_rng_init(1,2,3,4);
     
-    for (size_t j = 0; j < 10; j++)
-    {     
-        __m256i x = simd_rng.next(&simd_rng.state);
+    struct pcg32i rng_1;
+    struct pcg32i rng_2;
+    struct pcg32i rng_3;
+    struct pcg32i rng_4;
+    
+    rng_1.current = (uint32_t) mix(1);
+    rng_1.increment = (uint32_t) (mix(mix(1)) | 1);
+    
+    rng_2.current = (uint32_t) mix(2);
+    rng_2.increment = (uint32_t) (mix(mix(2)) | 1);
+    
+    rng_3.current = (uint32_t) mix(3);
+    rng_3.increment = (uint32_t) (mix(mix(3)) | 1);
+    
+    rng_4.current = (uint32_t) mix(4);
+    rng_4.increment = (uint32_t) (mix(mix(4)) | 1);
+    
+    __m256i simd_out_vec;
+    uint32_t *simd_out;
+    
+    //display seeds
+    __m256i x = simd_rng.state.current;
+    uint64_t *x_ = (uint64_t *) &x;
+    printf("simd seed current: %llu\t%llu\t%llu\t%llu\n", x_[0], x_[1], x_[2], x_[3]);
+    printf("sisd seed current: %u\t%u\t%u\t%u\n\n", rng_1.current, rng_2.current, rng_3.current, rng_4.current);
+    
+    x = simd_rng.state.increment;
+    x_ = (uint64_t *) &x;
+    printf("simd seed increment: %llu\t%llu\t%llu\t%llu\n", x_[0], x_[1], x_[2], x_[3]);
+    printf("sisd seed increment: %u\t%u\t%u\t%u\n\n", rng_1.increment, rng_2.increment, rng_3.increment, rng_4.increment);
+    
+    
+    //act
+    for (size_t i = 0; i < 10; i++)
+    {
+        simd_out_vec = simd_rng.next(&simd_rng.state);
+        simd_out = (uint32_t *) &simd_out_vec;
         
-        uint64_t *fx = (uint64_t *) &x;
+        for (size_t i = 0; i < 8; i++)
+        {
+            printf("%u\t", simd_out[i]);
+        }
+        puts("");
         
-        printf("%llu\t%llu\t%llu\t%llu\n", fx[0], fx[1], fx[2], fx[3]);
+        printf("%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\n\n", 
+               pcg32i_next(&rng_1), pcg32i_next(&rng_1), 
+               pcg32i_next(&rng_2), pcg32i_next(&rng_2),
+               pcg32i_next(&rng_3), pcg32i_next(&rng_3), 
+               pcg32i_next(&rng_4), pcg32i_next(&rng_4)
+               );
     }
 }
 
@@ -232,6 +306,7 @@ void test_simd_pcg_32_bit_insecure_generator(void)
 
 int main(void)
 {
+    /*
     UNITY_BEGIN();
         RUN_TEST(test_deterministic_seed_pcg_output);
         RUN_TEST(test_monte_carlo_of_rng_bias_at_256_bits_of_resolution);
@@ -240,6 +315,7 @@ int main(void)
     UNITY_END();
     
     speed_test();
+    */
     
     test_simd_pcg_32_bit_insecure_generator();
     
