@@ -12,9 +12,7 @@ bit output PCG extracted from O'Neill's C implementation on pcg_random.org.
 I have made a few changes. First, the seeding is done in rng_init() using Vigna
 modified SplitMix64 for determinstic seeding. For nondeterministic seeding, I
 tap rdrand directly instead of attempting to access entropy via dev/urandom or
-stack variable XORing which O'Neill uses. For the generator itself, I have
-simply gathered the relevant macros into a single function and decomposed the
-constants into magic numbers (pcg_setseq_64_rxs_m_xs_64_random_r).
+stack variable XORing which O'Neill uses.
 */
 
 uint64_t rng_generator
@@ -54,12 +52,9 @@ random_t rng_init
     }
     else
     {
-        if (rdrand(&rng.state.current))
+        if (rdrand(&rng.state.current) && rdrand(&rng.state.increment))
         {
-            if (rdrand(&rng.state.increment))
-            {
-                goto success;
-            }
+            goto success;
         }
 
         rng.state.current = 0;
