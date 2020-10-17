@@ -103,9 +103,6 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
     float results[135] = {0}; //holds monte carlo result for each output bit
     
     stream_t info;
-    double avg_use = 0;
-    uint64_t min_use = UINT64_MAX;
-    uint64_t max_use = 0;
     
     //act-assert
     for (size_t i = 0; i < MID_SIMULATION; i++)
@@ -120,11 +117,6 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
         info = rng.vndb(input_stream, output_stream, 2240, 135);
         TEST_ASSERT_EQUAL_INT(135, info.filled);
         
-        //ancillary points of interest
-        avg_use += (double) info.used;
-        if (info.used < min_use) min_use = info.used;
-        if (info.used > max_use) max_use = info.used;
-        
         //walk through the output stream and assess results of this round
         for (size_t k = 0; k < 135; k++)
         {
@@ -138,12 +130,6 @@ void test_von_neumann_debiaser_outputs_all_unbiased_bits(void)
         results[i] /= MID_SIMULATION;
         TEST_ASSERT_FLOAT_WITHIN(.01f, 0.5f, results[i]);
     }
-    
-    //points of interest
-    puts("POI: test_von_neumann_debiaser_outputs_all_unbiased_bits");
-    printf("average input bits used: %-10g\n", avg_use/MID_SIMULATION);
-    printf("maximum input bits used: %llu\n", max_use);
-    printf("minimum input bits used: %llu\n", min_use);
 }
 
 /*******************************************************************************
@@ -181,48 +167,16 @@ void test_cyclic_autocorrelation_of_alternating_bitstream(void)
 }
 
 /*******************************************************************************
-Benchmarks on 1 million draws.
-*/
-
-#define loop for (size_t i = 0; i < 1000000; i++)
-
-void speed_test(void)
-{
-    random_t rng = rng_init(0);
-    assert(rng.state.current != 0 && "rdrand failure");
-    init_timeit();       
-    puts("\n~~~~~ Speed Tests ~~~~~");
-    
-    //base PCG 64i generator
-    start_timeit();
-    loop { rng.next(self); }
-    end_timeit();
-    printf("PCG Generator: %llu us\n", result_timeit(MICROSECONDS));
-    
-    //rng bias at 8 generator calls
-    start_timeit();
-    loop { rng.bias(self, 1, 8); }
-    end_timeit();
-    printf("RNG Bias: %llu us\n", result_timeit(MICROSECONDS));
-    
-    //rng binomial at no additional generator calls (overhead only)
-    start_timeit();
-    loop { rng.bino(self, 64, 1, 8); }
-    end_timeit();
-    printf("RNG Binomial: %llu us\n", result_timeit(MICROSECONDS));
-}
-
-/*******************************************************************************
 Since the SIMD implemntation is quite tricky, I need to ensure that each 64 bit
 block is actually genreated from an independent PCG stream over two steps. So,
 this unit test generates those individual streams from single PCG32i streams,
 and then checks those values against the corresponding vector block. Since PCG
-32i is not a part of the API, I include those functions here.
+32i is not a part of the API, I include its entire implementation here.
 */
 
-static uint64_t mix (uint64_t value)
+uint64_t mix (uint64_t value)
 {
-    value ^=  value >> 30;
+    value ^= value >> 30;
     value *= 0xbf58476d1ce4e5b9ULL;
     value ^= value >> 27;
     value *= 0x94d049bb133111ebULL;
@@ -269,55 +223,71 @@ void test_simd_pcg_32_bit_insecure_generator(void)
     __m256i simd_out_vec;
     uint32_t *simd_out;
     
-    //display seeds
-    __m256i x = simd_rng.state.current;
-    uint64_t *x_ = (uint64_t *) &x;
-    printf("simd seed current: %llu\t%llu\t%llu\t%llu\n", x_[0], x_[1], x_[2], x_[3]);
-    printf("sisd seed current: %u\t%u\t%u\t%u\n\n", rng_1.current, rng_2.current, rng_3.current, rng_4.current);
-    
-    x = simd_rng.state.increment;
-    x_ = (uint64_t *) &x;
-    printf("simd seed increment: %llu\t%llu\t%llu\t%llu\n", x_[0], x_[1], x_[2], x_[3]);
-    printf("sisd seed increment: %u\t%u\t%u\t%u\n\n", rng_1.increment, rng_2.increment, rng_3.increment, rng_4.increment);
-    
-    
-    //act
-    for (size_t i = 0; i < 10; i++)
+    //act-assert
+    for (size_t i = 0; i < BIG_SIMULATION; i++)
     {
         simd_out_vec = simd_rng.next(&simd_rng.state);
         simd_out = (uint32_t *) &simd_out_vec;
         
-        for (size_t i = 0; i < 8; i++)
-        {
-            printf("%u\t", simd_out[i]);
-        }
-        puts("");
+        TEST_ASSERT_EQUAL_UINT32(simd_out[0], pcg32i_next(&rng_1));
+        TEST_ASSERT_EQUAL_UINT32(simd_out[1], pcg32i_next(&rng_1));
         
-        printf("%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\n\n", 
-               pcg32i_next(&rng_1), pcg32i_next(&rng_1), 
-               pcg32i_next(&rng_2), pcg32i_next(&rng_2),
-               pcg32i_next(&rng_3), pcg32i_next(&rng_3), 
-               pcg32i_next(&rng_4), pcg32i_next(&rng_4)
-               );
+        TEST_ASSERT_EQUAL_UINT32(simd_out[2], pcg32i_next(&rng_2));
+        TEST_ASSERT_EQUAL_UINT32(simd_out[3], pcg32i_next(&rng_2));
+        
+        TEST_ASSERT_EQUAL_UINT32(simd_out[4], pcg32i_next(&rng_3));
+        TEST_ASSERT_EQUAL_UINT32(simd_out[5], pcg32i_next(&rng_3));
+        
+        TEST_ASSERT_EQUAL_UINT32(simd_out[6], pcg32i_next(&rng_4));
+        TEST_ASSERT_EQUAL_UINT32(simd_out[7], pcg32i_next(&rng_4));
     }
+}
+
+/*******************************************************************************
+Benchmarks on 1 million draws.
+*/
+
+#define loop for (size_t i = 0; i < 1000000; i++)
+
+void speed_test(void)
+{
+    random_t rng = rng_init(0);
+    assert(rng.state.current != 0 && "rdrand failure");
+    init_timeit();       
+    puts("\n~~~~~ Speed Tests ~~~~~");
+    
+    //base PCG 64i generator
+    start_timeit();
+    loop { rng.next(self); }
+    end_timeit();
+    printf("PCG Generator: %llu us\n", result_timeit(MICROSECONDS));
+    
+    //rng bias at 8 generator calls
+    start_timeit();
+    loop { rng.bias(self, 1, 8); }
+    end_timeit();
+    printf("RNG Bias: %llu us\n", result_timeit(MICROSECONDS));
+    
+    //rng binomial at no additional generator calls (overhead only)
+    start_timeit();
+    loop { rng.bino(self, 64, 1, 8); }
+    end_timeit();
+    printf("RNG Binomial: %llu us\n", result_timeit(MICROSECONDS));
 }
 
 /******************************************************************************/
 
 int main(void)
 {
-    /*
     UNITY_BEGIN();
         RUN_TEST(test_deterministic_seed_pcg_output);
         RUN_TEST(test_monte_carlo_of_rng_bias_at_256_bits_of_resolution);
         RUN_TEST(test_von_neumann_debiaser_outputs_all_unbiased_bits);
         RUN_TEST(test_cyclic_autocorrelation_of_alternating_bitstream);
+        RUN_TEST(test_simd_pcg_32_bit_insecure_generator);
     UNITY_END();
     
     speed_test();
-    */
-    
-    test_simd_pcg_32_bit_insecure_generator();
     
     return EXIT_SUCCESS;
 }
