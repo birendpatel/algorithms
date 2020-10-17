@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
+#include <immintrin.h>
 
 #include "timeit.h"
 #include "random.h"
@@ -196,19 +197,35 @@ void speed_test(void)
     start_timeit();
     loop { rng.next(self); }
     end_timeit();
-    printf("PCG Generator: %llu mu\n", result_timeit(MICROSECONDS));
+    printf("PCG Generator: %llu us\n", result_timeit(MICROSECONDS));
     
     //rng bias at 8 generator calls
     start_timeit();
     loop { rng.bias(self, 1, 8); }
     end_timeit();
-    printf("RNG Bias: %llu mu\n", result_timeit(MICROSECONDS));
+    printf("RNG Bias: %llu us\n", result_timeit(MICROSECONDS));
     
     //rng binomial at no additional generator calls (overhead only)
     start_timeit();
     loop { rng.bino(self, 64, 1, 8); }
     end_timeit();
-    printf("RNG Binomial: %llu mu\n", result_timeit(MICROSECONDS));
+    printf("RNG Binomial: %llu us\n", result_timeit(MICROSECONDS));
+}
+
+/******************************************************************************/
+
+void test_simd_pcg_32_bit_insecure_generator(void)
+{
+    random_simd_t rng_simd = rng_simd_init(1,2,3,4);
+    
+    for (size_t j = 0; j < 10; j++)
+    {     
+        __m256i x = rng_simd.next(&rng_simd.state);
+        
+        uint64_t *fx = (uint64_t *) &x;
+        
+        printf("%llu\t%llu\t%llu\t%llu\n", fx[0], fx[1], fx[2], fx[3]);
+    }
 }
 
 /******************************************************************************/
@@ -223,6 +240,8 @@ int main(void)
     UNITY_END();
     
     speed_test();
+    
+    test_simd_pcg_32_bit_insecure_generator();
     
     return EXIT_SUCCESS;
 }

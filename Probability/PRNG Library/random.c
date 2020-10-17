@@ -35,7 +35,7 @@ Java's SplittableRandom: http://xoshiro.di.unimi.it/splitmix64.c but since its
 just a one-off mixing function I removed the state increment that Vigna employs.
 */
 
-static uint64_t mix 
+uint64_t rng_hash 
 (
     uint64_t value
 )
@@ -137,8 +137,8 @@ random_t rng_init
     
     if (seed != 0) 
     {
-        rng.state.current = mix(seed);
-        rng.state.increment = mix(mix(seed));
+        rng.state.current = rng_hash(seed);
+        rng.state.increment = rng_hash(rng_hash(seed));
     }
     else
     {
@@ -185,7 +185,7 @@ random_simd_t rng_simd_init
     const uint64_t seed_4
 )
 {
-    random_simd_t rng_vec;
+    random_simd_t rng_simd;
     
     uint64_t LL;
     uint64_t LH;
@@ -194,12 +194,12 @@ random_simd_t rng_simd_init
     
     if (seed_1 != 0 && seed_2 != 0 && seed_3 != 0 && seed_4 != 0)
     {
-        LL = mix(seed_1);
-        LH = mix(seed_2);
-        HL = mix(seed_3);
-        HH = mix(seed_4);
+        LL = rng_hash(seed_1);
+        LH = rng_hash(seed_2);
+        HL = rng_hash(seed_3);
+        HH = rng_hash(seed_4);
         
-        rng_vec.state.current = _mm256_set_epi64x
+        rng_simd.state.current = _mm256_set_epi64x
         (
             (int64_t) (LL >> 32),
             (int64_t) (LH >> 32),
@@ -207,12 +207,12 @@ random_simd_t rng_simd_init
             (int64_t) (HH >> 32)                          
         );
              
-        LL = mix(LL);
-        LH = mix(LH);
-        HL = mix(HL);
-        HH = mix(HH);
+        LL = rng_hash(LL);
+        LH = rng_hash(LH);
+        HL = rng_hash(HL);
+        HH = rng_hash(HH);
                          
-        rng_vec.state.increment = _mm256_set_epi64x
+        rng_simd.state.increment = _mm256_set_epi64x
         (
             (int64_t) ((LL >> 32) | 1),
             (int64_t) ((LH >> 32) | 1),
@@ -230,7 +230,7 @@ random_simd_t rng_simd_init
                 {
                     if (rdrand(&HH))
                     {
-                        rng_vec.state.current = _mm256_set_epi64x
+                        rng_simd.state.current = _mm256_set_epi64x
                         (
                             (int64_t) (LL >> 32),
                             (int64_t) (LH >> 32),
@@ -255,7 +255,7 @@ random_simd_t rng_simd_init
                 {
                     if (rdrand(&HH))
                     {
-                        rng_vec.state.increment = _mm256_set_epi64x
+                        rng_simd.state.increment = _mm256_set_epi64x
                         (
                             (int64_t) ((LL >> 32) | 1),
                             (int64_t) ((LH >> 32) | 1),
@@ -270,16 +270,16 @@ random_simd_t rng_simd_init
         }
         
         fail:
-            rng_vec.state.current = _mm256_setzero_si256();
-            rng_vec.state.increment = _mm256_setzero_si256();
+            rng_simd.state.current = _mm256_setzero_si256();
+            rng_simd.state.increment = _mm256_setzero_si256();
             goto terminate;
     }
     
     success:
-        rng_vec.next_simd = rng_generator_simd;
+        rng_simd.next = rng_generator_simd;
     
     terminate:
-        return rng_vec;
+        return rng_simd;
 }
 
 /*******************************************************************************
