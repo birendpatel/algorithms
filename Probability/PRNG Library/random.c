@@ -9,6 +9,25 @@
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
+#include <stdbool.h>
+
+/*******************************************************************************
+Retry loop for RDRAND x86 instruction. Per the Intel documentation, we give up 
+after ten failures.
+*/
+
+static bool rdrand(uint64_t *x)
+{
+    for (size_t i = 0; i < 10; i++)
+    {
+        if (_rdrand64_step(x))
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 /*******************************************************************************
 This is used to mix a user-supplied seed, it is Sebastiano Vigna's version of
@@ -123,26 +142,17 @@ random_t rng_init
     }
     else
     {
-        for (uint_fast8_t i = 0; i < 10; i++)
+        if (rdrand(&rng.state.current))
         {
-            if (_rdrand64_step(&rng.state.current))
+            if (rdrand(&rng.state.increment))
             {
-                for (uint_fast8_t j = 0; j < 10; j++)
-                {
-                    if (_rdrand64_step(&rng.state.increment))
-                    {
-                        goto success;
-                    }
-                }
-                
-                goto fail;
+                goto success;
             }
         }
-        
-        fail:
-            rng.state.current = 0;
-            rng.state.increment = 0;
-            goto terminate;
+
+        rng.state.current = 0;
+        rng.state.increment = 0;
+        goto terminate;
     }
     
     success:
@@ -160,11 +170,11 @@ random_t rng_init
 
 
 /*******************************************************************************
-This it the initialization function for the AVX API. ALmost the same as above
-but expanding in groups of 4 to easily handle the vector set mechanism. I have
-not yet included 10 calls per rdrand request. Notice for deterministic seeds
-that the state seed matches the mixed increment seed. This is to help unit test
-the generator streams.
+This it the initialization function for the AVX API. ALmost the same as 64-Bit
+but 4 seed parameters make the initialization of each PCG stream easier. It also
+allows for easier debugging as we can initialize a non-SIMD PCG32i and follow
+each "thread" individually. Since RDRAND needs up to 10 retries, we have a nasty
+but simple if-chain to perform the 80 total retries in 10-try blocks. 
 */
 
 random_simd_t rng_simd_init
@@ -177,62 +187,99 @@ random_simd_t rng_simd_init
 {
     random_simd_t rng_vec;
     
+    uint64_t LL;
+    uint64_t LH;
+    uint64_t HL;
+    uint64_t HH;
+    
     if (seed_1 != 0 && seed_2 != 0 && seed_3 != 0 && seed_4 != 0)
-    {        
+    {
+        LL = mix(seed_1);
+        LH = mix(seed_2);
+        HL = mix(seed_3);
+        HH = mix(seed_4);
+        
         rng_vec.state.current = _mm256_set_epi64x
-             (
-                 (int64_t) (mix(seed_1) >> 32),
-                 (int64_t) (mix(seed_2) >> 32),
-                 (int64_t) (mix(seed_3) >> 32),
-                 (int64_t) (mix(seed_4) >> 32)                          
-             );
+        (
+            (int64_t) (LL >> 32),
+            (int64_t) (LH >> 32),
+            (int64_t) (HL >> 32),
+            (int64_t) (HH >> 32)                          
+        );
+             
+        LL = mix(LL);
+        LH = mix(LH);
+        HL = mix(HL);
+        HH = mix(HH);
                          
         rng_vec.state.increment = _mm256_set_epi64x
-            (
-                (int64_t) ((mix(mix(seed_1)) >> 32) | 1),
-                (int64_t) ((mix(mix(seed_2)) >> 32) | 1),
-                (int64_t) ((mix(mix(seed_3)) >> 32) | 1),
-                (int64_t) ((mix(mix(seed_4)) >> 32) | 1)
-            );
+        (
+            (int64_t) ((LL >> 32) | 1),
+            (int64_t) ((LH >> 32) | 1),
+            (int64_t) ((HL >> 32) | 1),
+            (int64_t) ((HH >> 32) | 1)
+        );
     }
     else
     {
-        uint64_t a;
-        uint64_t b;
-        uint64_t c;
-        uint64_t d;
+        if (rdrand(&LL))
+        {
+            if (rdrand(&LH))
+            {
+                if (rdrand(&HL))
+                {
+                    if (rdrand(&HH))
+                    {
+                        rng_vec.state.current = _mm256_set_epi64x
+                        (
+                            (int64_t) (LL >> 32),
+                            (int64_t) (LH >> 32),
+                            (int64_t) (HL >> 32),
+                            (int64_t) (HH >> 32)                          
+                        );
+                        
+                        goto first_pass_success;
+                    }
+                }
+            }
+        }
+        goto fail;
         
-        _rdrand64_step(&a);
-        _rdrand64_step(&b);
-        _rdrand64_step(&c);
-        _rdrand64_step(&d);
+        first_pass_success:
         
-        rng_vec.state.current = _mm256_set_epi64x
-            (
-                 (int64_t) (a >> 32),
-                 (int64_t) (b >> 32),
-                 (int64_t) (c >> 32),
-                 (int64_t) (d >> 32)
-            );
+        if (rdrand(&LL))
+        {
+            if (rdrand(&LH))
+            {
+                if (rdrand(&HL))
+                {
+                    if (rdrand(&HH))
+                    {
+                        rng_vec.state.increment = _mm256_set_epi64x
+                        (
+                            (int64_t) ((LL >> 32) | 1),
+                            (int64_t) ((LH >> 32) | 1),
+                            (int64_t) ((HL >> 32) | 1),
+                            (int64_t) ((HH >> 32) | 1)
+                        );
+                        
+                        goto success;
+                    }
+                }
+            }
+        }
         
-        _rdrand64_step(&a);
-        _rdrand64_step(&b);
-        _rdrand64_step(&c);
-        _rdrand64_step(&d);
-        
-        rng_vec.state.increment = _mm256_set_epi64x
-            (
-                (int64_t) ((a >> 32) | 1),
-                (int64_t) ((b >> 32) | 1),
-                (int64_t) ((c >> 32) | 1),
-                (int64_t) ((d >> 32) | 1)
-            );
+        fail:
+            rng_vec.state.current = _mm256_setzero_si256();
+            rng_vec.state.increment = _mm256_setzero_si256();
+            goto terminate;
     }
     
+    success:
+        rng_vec.next_simd = rng_generator_simd;
     
-    rng_vec.next_simd = rng_generator_simd;
-    
-    return rng_vec;
+    terminate:
+        return rng_vec;
 }
 
 /*******************************************************************************

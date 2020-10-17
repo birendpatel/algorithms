@@ -104,7 +104,7 @@ typedef struct
 /*******************************************************************************
 * NAME: rng_init
 * DESC: initialize a variable of type random_t
-* OUTP: type random_t where zero state indicates rdrand failure.
+* OUTP: type random_t where zero state and increment indicates rdrand failure.
 * @ seed : set seed = 0 to use the x86 rdrand instruction.
 *******************************************************************************/
 random_t rng_init(const uint64_t seed);
@@ -220,7 +220,7 @@ typedef struct
 /*******************************************************************************
 * NAME: rng_simd_init
 * DESC: initialize a variable of type random_simd_t
-* OUTP: type random_t where zero state indicates rdrand failure.
+* OUTP: type random_t where zero state and increment indicates rdrand failure.
 * @ seed : set seed = 0 to use the x86 rdrand instruction.
 *******************************************************************************/
 random_simd_t rng_simd_init
