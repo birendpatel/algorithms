@@ -251,8 +251,8 @@ Benchmarks on 1 million draws.
 
 void speed_test(void)
 {
-    random_t rng = rng_init(0);
-    assert(rng.state.current != 0 && "rdrand failure");
+    simd_random_t simd_rng = simd_rng_init(10, 20, 30, 40);
+    random_t rng = rng_init(50);
     init_timeit();       
     puts("\n~~~~~ Speed Tests ~~~~~");
     
@@ -261,6 +261,25 @@ void speed_test(void)
     loop { rng.next(self); }
     end_timeit();
     printf("PCG Generator: %llu us\n", result_timeit(MICROSECONDS));
+    
+    //base PCG 64i generator at 4 calls (256 bits)
+    start_timeit();
+    loop
+    {
+        rng.next(self); rng.next(self);
+        rng.next(self); rng.next(self);
+    }
+    end_timeit();
+    printf("PCG Generator (4): %llu us\n", result_timeit(MICROSECONDS));
+    
+    //SIMD generator at 1 call (256 bits)    
+    start_timeit();
+    loop 
+    {
+        simd_rng.next(&simd_rng.state);
+    }
+    end_timeit();
+    printf("SIMD Generator: %llu us\n", result_timeit(MICROSECONDS));
     
     //rng bias at 8 generator calls
     start_timeit();
