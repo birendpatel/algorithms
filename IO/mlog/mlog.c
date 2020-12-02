@@ -20,7 +20,7 @@ trace itself for debugging purposes so it falls back onto a simple preprocessor
 switch.
 */
 
-#define LOCAL_TRACE 1
+#define LOCAL_TRACE 0
 
 #if LOCAL_TRACE == 0
     #define TRACE(msg, ...) /* NOP */
@@ -308,19 +308,4 @@ const char *mLogLookupError(int error)
     
     TRACE("error does not exist\n");
     return "\0";
-}
-
-/******************************************************************************/
-
-int main(void)
-{
-    mLogOpen("test.txt", "a", NULL, NULL);
-    
-    mLogTrace("test message %d", 123);
-    
-    mLogFatal("test message %s", "fatal test");
-    
-    mLogClose(true);
-    
-    return 0;
 }
